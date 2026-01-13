@@ -160,43 +160,9 @@ plot.add_plugin_to_task(Plot.PeakfinderPlugin(threshold=0.8))  # 峰值查找插
 plot.show()
 ```
 
-## 开发指南
-
-### 运行测试
-
-```bash
-pytest
-pytest --cov=signaltour  # 带覆盖率报告
-```
-
-### 代码规范
-
-```bash
-ruff check .           # 代码检查
-ruff check --fix .     # 自动修复
-ruff format .          # 代码格式化
-```
-
-### 构建文档
-
-```bash
-cd doc
-make html              # Linux/Mac
-make.bat html          # Windows
-```
-
-## 贡献指南
-
-欢迎贡献代码！请确保：
-
-- 代码遵循项目的代码规范（使用 ruff 格式化）
-- 为新功能添加测试用例
-- 更新相应的文档说明
-- 为公共函数提供类型提示
-
 ## 许可证
 
-MIT License
+Apache License 2.0
 
 详见 [LICENSE](LICENSE) 文件。
 
