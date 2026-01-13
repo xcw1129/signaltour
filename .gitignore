@@ -1,0 +1,12 @@
+.pytest_cache/
+.vscode/
+.ruff_cache/
+.venv/
+dist/
+build/
+signaltour.egg-info/
+__pycache__/
+uv.lock
+.coverage
+**.code-workspace
+tmpclaude*

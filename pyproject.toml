@@ -1,0 +1,71 @@
+# ======================================================= #
+# 项目运行环境配置
+[project]
+name = "signaltour"
+version = "1.0.0"
+authors = [
+    {name = "Xiong Chengwen", email = "xiongcw1129@gmail.com"},
+]
+license = {text = "Apache-2.0"}
+description = "Python package for the whole process of signal loading management, preprocessing, in-depth analysis and visualization of one-dimensional time series oscillation data"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0.0",
+    "scipy>=1.14.0",
+    "matplotlib>=3.9.0",
+    "pandas>=2.2.2",
+    "anytree>=2.13.0",
+    "pyarrow>=22.0.0",
+]
+# 依赖组配置
+[project.optional-dependencies]
+dev = [
+    "marimo>=0.18.4",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.11",
+    "ty>=0.0.11",
+]
+
+# ======================================================= #
+# 项目打包配置
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["*"]
+[tool.setuptools.package-data]
+"signaltour._Assist_Module" = ["*.ttf"]# 要求打包字体文件
+
+# ======================================================= #
+# Ruff 配置
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = []
+[tool.ruff.lint]
+select = [
+  "E",  # pycodestyle 错误
+  "F",  # pyflakes 检查
+  "W",  # pycodestyle 警告
+  "D",  # pydocstyle 文档风格
+  "I",  # isort 导入排序
+  "ANN201",  # 公共函数需要返回类型注解
+]
+ignore = [
+  "D105",  # 允许魔法方法缺少文档字符串（如 __repr__）
+  "D212",  # 多行摘要第一行（我们更喜欢第二行摘要，使用 D213）
+  "D205",  # 摘要行后允许空行（项目文档通常以标题块开头）
+  "D400",  # 第一行无需句号结尾（允许中文标题无句号）
+]
+# 文档注释风格
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+[tool.ruff.lint.isort]
+known-first-party = ["signal"]
+# 格式化规则
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
