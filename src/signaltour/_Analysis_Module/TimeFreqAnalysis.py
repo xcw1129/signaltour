@@ -293,16 +293,16 @@ class CWTAnalysis(BaseAnalysis):
         param: dict,
         scale: np.ndarray,
         N: int,
-        normalType: str = "能量",
+        normalize: str = "能量",
         isPlot: bool = False,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> np.ndarray:
         """
-        生成指定参数小波在不同尺度下的采样序列
+        生成指定参数基小波在不同尺度下的采样序列
 
         Parameters
         ----------
         type : str
-            小波函数类型, 支持:
+            基小波类型, 支持:
             - "Morlet": Morlet小波, 参数: fc(中心频率, 默认5), fb(带宽参数, 默认5)
             - "MexicanHat": Mexican Hat (Ricker)小波, 参数: fb(带宽参数, 默认5)
             - "DOG": DOG (Derivative of Gaussian)小波, 参数: order(阶数, 默认2), fb(带宽参数, 默认5)
@@ -310,30 +310,30 @@ class CWTAnalysis(BaseAnalysis):
             - "shannon": Shannon小波, 参数: fc(中心频率, 默认5), fb(带宽参数, 默认5)
             - "harmonic": 谐波小波, 参数: fc(中心频率, 默认5), fb(带宽参数, 默认5)
         param : dict
-            小波函数参数字典, 详见type参数说明
+            基小波函数参数字典, 详见type参数说明
         scale : np.ndarray
-            尺度缩放序列, 推荐使用CWTAnalysis.get_scale()生成
+            离散尺度序列, 必须满足0<scale<=1. 推荐使用CWTAnalysis.get_scale()生成
         N : int
-            离散采样点数, 一般取信号长度
-        normalType : str, default: "能量"
-            归一化类型, 支持: "能量", "幅值", "无归一化"
+            离散采样点数, 一般取待变换信号长度
+        normalize : str, default: "能量"
+            归一化类型, 支持: "能量", "幅值", "无"
         isPlot : bool, default: False
             是否绘制选定小波函数的采样时域波形和频谱
 
         Returns
         -------
-        (np.ndarray, np.ndarray)
-            小波采样序列矩阵, 小波中心频率序列
+        np.ndarray
+            基小波采样序列矩阵, shape=(len(scale), N)
 
         Notes
         -----
-        函数内部自动设置各小波的剩余参数, 使得scale=1时采样支撑集为[-0.5, 0.5].
+        函数内部自动设置各基小波的剩余参数, 使得基小波支撑集恰好为[-0.5, 0.5]
 
-        当对小波函数进行[-0.5,0.5]区间采样时, scale=1下小波原子取得最窄频域支撑集, 且保持频响特性.
+        即当对基小波进行[-0.5,0.5]区间采样时, scale=1下基小波原子取得最窄频域支撑集, 且保持频响特性
         """
-        # 标准采样时间轴, 此时N即为小波离散采样频率
+        # 标准采样时间轴, 此时N即为基小波离散采样频率
         time = np.linspace(0, 1, N, endpoint=False) - 0.5
-        # 自适应调整小波参数使满足支撑集为[-0.5, 0.5]
+        # 自适应调整基小波参数使满足支撑集为[-0.5, 0.5]
         if type == "Morlet":
             # Morlet小波，参数：fc(中心频率)
             fc = param.get("fc", 5)
@@ -399,7 +399,7 @@ class CWTAnalysis(BaseAnalysis):
                     n = int((fc + fb / 2) * (t[i][-1] - t[i][0])) + 1
                     X_f[i, m:n] = (1 + 0j) / (n - m)
                 atom = fft.ifft(X_f, axis=1)
-                atom = np.fft.fftshift(atom, axes=1)  # 时域居中
+                atom = np.fft.fftshift(x=atom, axes=1)  # 时域居中
                 return atom
 
         else:
@@ -407,17 +407,13 @@ class CWTAnalysis(BaseAnalysis):
         # 生成不同尺度下的时间轴, 并带入小波解析函数得采样序列
         time_Diffscale = time / scale.reshape(-1, 1)
         waveletMat = atom_func(time_Diffscale)
-        # 小波归一化
-        if normalType == "能量":
+        # 归一化
+        if normalize == "能量":  # 缩放前后能量一致
             waveletMat /= linalg.norm(waveletMat, axis=1, keepdims=True)
-        elif normalType == "幅值":
+        elif normalize == "幅值":  # 缩放前后频谱峰值一致
             waveletMat /= scale.reshape(-1, 1)
-        elif normalType == "无归一化":
+        else:  # 缩放前后时域峰值一致
             pass
-        else:
-            raise ValueError(f"normalType={normalType}: 不支持的归一化类型")
-        # 计算不同尺度下的小波中心频率
-        freqCenter = fc / scale
         if isPlot:
             Sig_wavelet = Signal(
                 t_Axis(N=waveletMat.shape[1], T=1, t0=-0.5),
@@ -436,13 +432,14 @@ class CWTAnalysis(BaseAnalysis):
                 )
             else:
                 plot.waveform(Sig_wavelet, title="时域波形")
+            fcList = fc / scale
             plot.spectrum(
                 np.abs(Sig_wavelet.to_Spectra().halfCut()),
-                title=f"频谱:fc={freqCenter[0]:.2f}Hz",
+                title=f"频谱:fc={fcList[0]:.2f}Hz",
             )
             plot.show()
             return None
-        return waveletMat, freqCenter
+        return waveletMat
 
     @BaseAnalysis._plot(spectrogram_PlotFunc)
     def cwt(
