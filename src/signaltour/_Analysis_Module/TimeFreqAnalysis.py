@@ -7,13 +7,13 @@
 
     - class:
         - `STFTAnalysis`: 短时傅里叶变换 (Short-Time Fourier Transform, STFT) 分析类
-        - `WVDAnalysis`: 魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类接口
+        - `WVDAnalysis`: 魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类
         - `CWTAnalysis`: 连续小波变换 (Continuous Wavelet Transform, CWT) 分析类
 """
 
 __all__ = ["STFTAnalysis", "WVDAnalysis", "CWTAnalysis"]
 
-from .._Assist_Module.Dependencies import Optional, Tuple, fft, linalg, np, signal
+from .._Assist_Module.Dependencies import Optional, fft, linalg, np, signal
 from .._Plot_Module.ImagePlot import spectrogram_PlotFunc
 from .._Plot_Module.LinePlot import LinePlot
 from .._Signal_Module.core import Signal, t_Axis
@@ -170,7 +170,7 @@ class STFTAnalysis(BaseAnalysis):
 
 class WVDAnalysis(BaseAnalysis):
     """
-    魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类接口
+    魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类
 
     用于计算信号的Cohen类双线性时频分布, 具有高时频分辨率但存在交叉项
 
