@@ -248,11 +248,11 @@ class CWTAnalysis(BaseAnalysis):
 
     @staticmethod
     def get_scale(b: float = 2, j: int = 10, v: int = 1) -> np.ndarray:
-        """生成对数分布离散尺度轴, b^j<=s<=1"""
+        """生成对数分布离散尺度轴, b^(-j)<s<=1"""
         if b <= 1:
             raise ValueError("b必须大于1")
-        # s=1, b^(1/v), b^(2/v),.., b^(1),..., b^(2),..., b^(j)
-        scale = 1 / np.logspace(0, j, v * j + 1, endpoint=True, base=b)
+        # s=1, b^(-1/v), b^(-2/v),.., b^(-1),..., b^(-2),..., b^(-j)
+        scale = 1 / np.logspace(0, j, v * j, endpoint=False, base=b)
         return scale
 
     @staticmethod
