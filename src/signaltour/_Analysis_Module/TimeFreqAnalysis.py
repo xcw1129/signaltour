@@ -459,7 +459,7 @@ class CWTAnalysis(BaseAnalysis):
         ----------
         flow : float, optional
             最小分析频率, 单位Hz
-            默认值为信号频率轴分辨率的5倍
+            默认值为信号频率轴分辨率的10倍
         fhigh : float, optional
             最大分析频率, 单位Hz
             默认值为信号采样频率的50%(奈奎斯特频率)
@@ -480,7 +480,7 @@ class CWTAnalysis(BaseAnalysis):
             时间轴, 频率轴, CWT谱矩阵
         """
         # 生成离散尺度轴
-        flow = 5 * self.Sig.f_axis.df if flow is None else flow
+        flow = 10 * self.Sig.f_axis.df if flow is None else flow
         fhigh = self.Sig.t_axis.fs / 2 if fhigh is None else fhigh
         ratio = fhigh / flow
         j = int(np.log2(ratio)) + 1
