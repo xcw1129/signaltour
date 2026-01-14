@@ -247,7 +247,7 @@ class CWTAnalysis(BaseAnalysis):
     """
 
     @staticmethod
-    def get_scale(b: float = 2, j: int = 10, v: int = 1):
+    def get_scale(b: float = 2, j: int = 10, v: int = 1) -> np.ndarray:
         """生成对数分布离散尺度轴, b^j<=s<=1"""
         if b <= 1:
             raise ValueError("b必须大于1")
@@ -256,7 +256,7 @@ class CWTAnalysis(BaseAnalysis):
         return scale
 
     @staticmethod
-    def show_TFcover(time: np.ndarray, freq: np.ndarray, dfreq: np.ndarray, boxArea: float):
+    def show_TFcover(time: np.ndarray, freq: np.ndarray, dfreq: np.ndarray, boxArea: float) -> None:
         """显示时频字典指定分辨率下的时频覆盖情况"""
         fig, ax = LinePlot(
             scheme="LinePlot2",
@@ -447,7 +447,7 @@ class CWTAnalysis(BaseAnalysis):
     @BaseAnalysis._plot(spectrogram_PlotFunc)
     def cwt(
         self,
-        flow: float,
+        flow: Optional[float] = None,
         fhigh: Optional[float] = None,
         nperoctave: int = 10,
         wavelet: str = "Morlet",
@@ -457,11 +457,12 @@ class CWTAnalysis(BaseAnalysis):
 
         Parameters
         ----------
-        flow : float
+        flow : float, optional
             最小分析频率, 单位Hz
+            默认值为信号频率轴分辨率的5倍
         fhigh : float, optional
             最大分析频率, 单位Hz
-            默认值为信号采样频率的40%(奈奎斯特频率的80%)
+            默认值为信号采样频率的50%(奈奎斯特频率)
         nperoctave : int, default: 10
             每倍频程的离散尺度数, 控制尺度轴分辨率
         wavelet : str, default: "Morlet"
@@ -479,11 +480,12 @@ class CWTAnalysis(BaseAnalysis):
             时间轴, 频率轴, CWT谱矩阵
         """
         # 生成离散尺度轴
-        fhigh = 0.8 * self.Sig.t_axis.fs / 2 if fhigh is None else fhigh
+        flow = 5 * self.Sig.f_axis.df if flow is None else flow
+        fhigh = self.Sig.t_axis.fs / 2 if fhigh is None else fhigh
         ratio = fhigh / flow
         j = int(np.log2(ratio)) + 1
         scale = CWTAnalysis.get_scale(b=2, j=j, v=nperoctave)  # s<=1
-        # 生成基小波的离散采样序列
+        # 生成基小波的离散尺度采样序列
         waveletMat, freq = CWTAnalysis.get_wavelet(
             type=wavelet,
             param={"fc": flow / self.Sig.f_axis.df},  # 归一化频率
@@ -492,7 +494,7 @@ class CWTAnalysis(BaseAnalysis):
             normalType="幅值",
         )
         freq *= self.Sig.f_axis.df  # 转换为实际频率值
-        time = self.Sig.t_axis()
+        time: np.ndarray = self.Sig.t_axis()
         # 去除中心频率超出fhigh的尺度
         validIdx = np.where(freq <= fhigh)[0]
         waveletMat, freq = waveletMat[validIdx, :], freq[validIdx]
