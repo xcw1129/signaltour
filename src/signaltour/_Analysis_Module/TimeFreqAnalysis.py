@@ -232,18 +232,21 @@ class CWTAnalysis(BaseAnalysis):
     -------
     - get_scale(b: float = 2, j: int = 10, v: int = 1)
             -> np.ndarray
-        生成对数分布离散尺度轴, b^j<=s<=1
+        生成对数分布离散尺度轴, b^(-j)<s<=1
+
     - show_TFcover(time: np.ndarray, freq: np.ndarray, dfreq: np.ndarray, boxArea: float)
             -> None
-        显示时频字典指定分辨率下的时频覆盖情况
+        显示离散时频字典指定分辨率下的时频面覆盖情况
+
     - get_wavelet(type: str, param: dict, scale: np.ndarray,
-            N: int, normalType: str = "能量", isPlot: bool = False)
+            N: int, normalize: str = "能量", isPlot: bool = False)
             -> Tuple[np.ndarray, np.ndarray]
-        生成指定参数小波在不同尺度下的采样序列
+        生成指定参数基小波在不同尺度下的采样序列
+
     - cwt(flow: float, fhigh: Optional[float] = None,
             nperoctave: int = 10, wavelet: str = "Morlet")
             -> tuple[np.ndarray, np.ndarray, np.ndarray]
-        计算信号的CWT时频谱, 返回时间轴、频率轴和谱矩阵
+        计算信号的连续小波变换时间-尺度谱
     """
 
     @staticmethod
@@ -257,7 +260,7 @@ class CWTAnalysis(BaseAnalysis):
 
     @staticmethod
     def show_TFcover(time: np.ndarray, freq: np.ndarray, dfreq: np.ndarray, boxArea: float) -> None:
-        """显示时频字典指定分辨率下的时频覆盖情况"""
+        """显示离散时频字典指定分辨率下的时频面覆盖情况"""
         fig, ax = LinePlot(
             scheme="LinePlot2",
             figsize=(8, 6),
@@ -450,7 +453,7 @@ class CWTAnalysis(BaseAnalysis):
         wavelet: str = "Morlet",
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        计算信号的连续小波变换时间-尺度谱
+        计算信号的连续小波变换时频谱
 
         Parameters
         ----------
@@ -496,12 +499,12 @@ class CWTAnalysis(BaseAnalysis):
         validIdx = np.where(freq <= self.Sig.t_axis.fs / 2)[0]
         waveletMat, freq = waveletMat[validIdx, :], freq[validIdx]
         # 滤波法计算CWT谱矩阵: 兼容复小波和实小波
-        W = np.stack(
+        Wf = np.stack(
             [
                 signal.convolve(self.Sig._data, np.conj(waveletMat[i])[::-1], mode="same")  # 计算平移相关
                 for i in range(waveletMat.shape[0])
             ]
         ).T  # 转置后0维为时间轴, 1维为尺度轴
         if self.isPlot:
-            return time, freq, np.abs(W) if np.iscomplexobj(W) else W
-        return time, freq, W
+            return time, freq, np.abs(Wf) if np.iscomplexobj(Wf) else Wf
+        return time, freq, Wf
