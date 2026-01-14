@@ -483,17 +483,17 @@ class CWTAnalysis(BaseAnalysis):
         j = int(np.log2(ratio)) + 1
         scale = CWTAnalysis.get_scale(b=2, j=j, v=nperoctave)  # s<=1
         # 生成基小波的离散尺度采样序列
-        waveletMat, freq = CWTAnalysis.get_wavelet(
+        waveletMat = CWTAnalysis.get_wavelet(
             type=wavelet,
             param={"fc": flow / self.Sig.f_axis.df},  # 归一化频率
             scale=scale,
             N=len(self.Sig),
-            normalType="幅值",
+            normalize="幅值",
         )
-        freq *= self.Sig.f_axis.df  # 转换为实际频率值
+        freq = flow / scale
         time: np.ndarray = self.Sig.t_axis()
-        # 去除中心频率超出fhigh的尺度
-        validIdx = np.where(freq <= fhigh)[0]
+        # 去除中心频率超出fn的尺度
+        validIdx = np.where(freq <= self.Sig.t_axis.fs / 2)[0]
         waveletMat, freq = waveletMat[validIdx, :], freq[validIdx]
         # 滤波法计算CWT谱矩阵: 兼容复小波和实小波
         W = np.stack(
