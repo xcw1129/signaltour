@@ -103,13 +103,14 @@ class ImagePlot(BasePlot):
             Matrix = data.get("Matrix")
             axis1, axis2 = data.get("axis1"), data.get("axis2")
             kwargs_pcolormesh = kwargs.get("pcolormesh", {})
-            T, F = np.meshgrid(axis1, axis2)
+            time, freq = np.meshgrid(axis1, axis2)
             ax.pcolormesh(
-                T,
-                F,
+                time,
+                freq,
                 Matrix.T,  # 时间行转置为列, 符合时频图习惯
                 **kwargs_pcolormesh,
             )
+            ax.set_ylim(axis2[0], axis2[-1])  # 显示指定频率范围, 防止pcolormesh自动扩展边界
 
         # ------------------------------------------------------------------------------------#
         # 时频谱图绘制个性化设置
