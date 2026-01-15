@@ -20,7 +20,9 @@
 ### TimeFreqAnalysis: 非平稳信号时频分析模块, 提供多种时频谱图计算方法
     - class:
         - `STFTAnalysis`: 短时傅里叶变换 (Short-Time Fourier Transform, STFT) 分析类
-        - `WVDAnalysis`: 魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类接口
+        - `WVDAnalysis`: 魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类
+### WaveletAnalysis:小波分析模块, 提供连续小波、离散小波等多种小波多分辨率分析方法
+    - class:
         - `CWTAnalysis`: 连续小波变换 (Continuous Wavelet Transform, CWT) 分析类
 ### ModeAnalysis: 非平稳多分量信号模态分解模块, 提供多种分解算法(如EMD, VMD)的实现与辅助函数
     - function:
@@ -41,6 +43,7 @@ from ._Analysis_Module.core import *
 from ._Analysis_Module.StatsTrendAnalysis import *
 from ._Analysis_Module.SpectrumAnalysis import *
 from ._Analysis_Module.TimeFreqAnalysis import *
+from ._Analysis_Module.WaveletAnalysis import *
 from ._Analysis_Module.ModeAnalysis import *
 
 if __name__ == "__main__":

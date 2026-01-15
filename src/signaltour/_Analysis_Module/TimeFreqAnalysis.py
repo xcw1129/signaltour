@@ -8,7 +8,6 @@
     - class:
         - `STFTAnalysis`: 短时傅里叶变换 (Short-Time Fourier Transform, STFT) 分析类
         - `WVDAnalysis`: 魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类
-        - `CWTAnalysis`: 连续小波变换 (Continuous Wavelet Transform, CWT) 分析类
 """
 
 __all__ = ["STFTAnalysis", "WVDAnalysis", "CWTAnalysis"]
