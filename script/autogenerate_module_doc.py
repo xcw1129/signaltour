@@ -110,7 +110,7 @@ def generate_module_docstring(fpath: str, title: str = "", summary: str = ""):
     final_content = docstring + content_after_docstring
     with open(fpath, "w", encoding="utf-8") as f:
         f.write(final_content)
-    print(f"成功: 文档字符串已更新 \n'{fpath}'")
+    print(f"文档字符串已更新: '{fpath}'")
 
     # 5. 返回用于接口聚合文件的文档字符串
     simplified_docstring = ["\n##", docstring_head, "\n"] + docstring_interface_section
