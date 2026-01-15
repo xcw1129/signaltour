@@ -33,8 +33,6 @@ class BaseAnalysis:
     ----------
     Sig : Signal
         待分析信号
-    isPacket : bool
-        是否对结果进行类型封装
     isPlot : bool
         是否绘制分析结果图
     plot_kwargs : dict
@@ -45,7 +43,6 @@ class BaseAnalysis:
         self,
         Sig: Signal,
         isLinked: bool = True,
-        isPacket: bool = True,
         isPlot: bool = False,
         **kwargs,
     ):
@@ -58,13 +55,10 @@ class BaseAnalysis:
             待分析信号
         isLinked : bool, default: True
             是否链接原始待分析信号
-        isPacket : bool, default: True
-            是否对结果进行类型封装
         isPlot : bool, default: False
             是否绘制分析结果图
         """
         self.Sig = Sig if isLinked else Sig.copy()
-        self.isPacket = isPacket
         self.isPlot = isPlot
         self.plot_kwargs = kwargs
 
@@ -101,23 +95,6 @@ class BaseAnalysis:
                 else:
                     plot_func(plot_args, **self.plot_kwargs)
                 return None  # 绘图则不返回结果
-
-            return wrapper
-
-        return decorator
-
-    @staticmethod
-    def _packet() -> Callable:
-        """Analysis类专用结果封装格式转换装饰器, 对方法运行结果进行解封装"""
-
-        def decorator(func):
-            def wrapper(self, *args, **kwargs):
-                Srs = func(self, *args, **kwargs)
-                if Srs is None:
-                    return None
-                if not self.isPacket:
-                    return Srs._data.copy()  # 不进行封装, 直接返回数据
-                return Srs  # 进行封装, 返回Series类型结果
 
             return wrapper
 
