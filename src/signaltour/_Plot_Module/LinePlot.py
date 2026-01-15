@@ -138,7 +138,7 @@ class LinePlot(BasePlot):
         self.tasks.append(task)
         return self
 
-    def spectrum(self, Spc: Spectra, isFindPeaks: bool = True, isPosNeg: bool = False, **kwargs) -> "LinePlot":
+    def spectrum(self, Spc: Spectra, isFindPeaks: bool = False, isPosNeg: bool = False, **kwargs) -> "LinePlot":
         """
         注册一个谱图的绘制任务
 
@@ -146,7 +146,7 @@ class LinePlot(BasePlot):
         ----------
         Spc : Spectra
             需要绘制的谱对象
-        isFindPeaks: bool, default: True
+        isFindPeaks: bool, default: False
             是否需要在谱中标注峰值谱线
         isPosNeg: bool, default: False
             是否需要对谱线正负值进行不同颜色显示
