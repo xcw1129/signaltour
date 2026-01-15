@@ -13,7 +13,7 @@
 
 __all__ = ["STFTAnalysis", "WVDAnalysis", "CWTAnalysis"]
 
-from .._Assist_Module.Dependencies import Optional, fft, linalg, np, signal, Literal
+from .._Assist_Module.Dependencies import Literal, Optional, fft, linalg, np, signal
 from .._Plot_Module.ImagePlot import spectrogram_PlotFunc
 from .._Plot_Module.LinePlot import LinePlot
 from .._Signal_Module.core import Signal, t_Axis
@@ -233,7 +233,7 @@ class CWTAnalysis(BaseAnalysis):
     - get_scale(b: float = 2, j: int = 10, v: int = 1)
             -> np.ndarray
         生成对数分布离散尺度轴, b^(-j)<s<=1
-    - get_wavelet(type: Literal[...], param: dict, scale: np.ndarray,
+    - get_wavelet(type: str, param: dict, scale: np.ndarray,
             N: int, normalized: str = "能量", isPlot: bool = False)
             -> np.ndarray
         生成指定参数基小波在不同尺度下的采样序列
@@ -254,13 +254,14 @@ class CWTAnalysis(BaseAnalysis):
 
     @staticmethod
     def get_wavelet(
-        type: Literal["Morlet", "MexicanHat", "DOG", "B-Spline", "shannon", "harmonic"],
-        param: dict,
-        scale: np.ndarray,
-        N: int,
+        type: str,
+        param: dict = {},
+        scale: Optional[np.ndarray] = None,
+        N: int = 1024,
         normalized: str = "能量",
+        includeScaling: bool = False,
         isPlot: bool = False,
-    ) -> np.ndarray:
+    ) -> np.ndarray | None:
         """
         生成指定参数基小波在不同尺度下的采样序列
 
@@ -278,40 +279,50 @@ class CWTAnalysis(BaseAnalysis):
             - "B-Spline": B样条小波, 参数: fc(中心频率, 默认5), fb(带宽, 默认5), p(阶数, 默认2)
             - "shannon": Shannon小波, 参数: fc(中心频率, 默认5), fb(带宽, 默认5)
             - "harmonic": 谐波小波, 参数: fc(中心频率, 默认5), fb(带宽, 默认5)
-        param : dict
+        param : dict, optional
             基小波函数参数字典, 详见type参数说明. 实小波通常没有fc参数
-        scale : np.ndarray
+        scale : np.ndarray, optional
             离散尺度序列, 必须满足0<scale<=1. 推荐使用CWTAnalysis.get_scale()生成
-        N : int
+        N : int, default: 1024
             离散采样点数, 一般取待变换信号长度
         normalized : str, default: "能量"
             归一化类型, 支持: "能量", "幅值", "无"
+        includeScaling : bool, default: False
+            是否生成scale=1下的尺度函数采样序列
         isPlot : bool, default: False
             是否绘制选定基小波采样后时域波形和频谱
 
         Returns
         -------
-        np.ndarray
-            基小波不同尺度采样序列, shape=(len(scale), N)
+        np.ndarray or None
+            基小波不同尺度采样序列, shape=(len(scale), N). 如果includeScaling=True, 则shape=(len(scale)+1, N)
         """
         match type:
             case "Morlet":
 
-                def atom_func(t, fc=5, fb=5):
+                def wavelet_func(t, fc=5, fb=5):
                     b = 1 / fb
                     atom = np.exp(-0.5 * (t / b) ** 2) * np.exp(1j * 2 * np.pi * fc * t)
                     return atom
 
+                def scaling_func(t, fc=5, fb=5):
+                    b = 1 / fb
+                    return np.exp(-0.5 * (t / b) ** 2)
+
             case "MexicanHat":
 
-                def atom_func(t, fb=5):
+                def wavelet_func(t, fb=5):
                     fb *= 1.7
                     atom = (1 - (t * fb) ** 2) * np.exp(-0.5 * (t * fb) ** 2)
                     return atom
 
+                def scaling_func(t, fb=5):
+                    fb *= 1.7
+                    return np.exp(-0.5 * (t * fb) ** 2)
+
             case "DOG":
 
-                def atom_func(t, fb=5, order=2):
+                def wavelet_func(t, fb=5, order=2):
                     fb *= 1.7
                     b = 1 / fb
                     guassian = np.exp(-0.5 * (t / b) ** 2)
@@ -319,21 +330,32 @@ class CWTAnalysis(BaseAnalysis):
                         guassian = -1 * np.gradient(guassian, axis=1)
                     return guassian
 
+                def scaling_func(t, fb=5, order=2):
+                    fb *= 1.7
+                    b = 1 / fb
+                    return np.exp(-0.5 * (t / b) ** 2)
+
             case "B-Spline":
 
-                def atom_func(t, fc=5, fb=5, p=2):
+                def wavelet_func(t, fc=5, fb=5, p=2):
                     atom = np.sinc(fb * t / p) ** p * np.exp(1j * 2 * np.pi * fc * t)
                     return atom
 
+                def scaling_func(t, fc=5, fb=5, p=2):
+                    return np.sinc(fb * t / p) ** p
+
             case "shannon":
 
-                def atom_func(t, fc=5, fb=5):
+                def wavelet_func(t, fc=5, fb=5):
                     atom = np.sinc(fb * t) * np.exp(1j * 2 * np.pi * fc * t)
                     return atom
 
+                def scaling_func(t, fc=5, fb=5):
+                    return np.sinc(fb * t)
+
             case "harmonic":
 
-                def atom_func(t, fc=5, fb=5):
+                def wavelet_func(t, fc=5, fb=5):
                     X_f = np.zeros_like(t, dtype=complex)
                     for i in range(len(t)):
                         m = int((fc - fb / 2) * (t[i][-1] - t[i][0]))
@@ -343,23 +365,22 @@ class CWTAnalysis(BaseAnalysis):
                     atom = np.fft.fftshift(x=atom, axes=1)  # 时域居中
                     return atom
 
+                def scaling_func(t, fc=5, fb=5):
+                    X_f = np.zeros_like(t, dtype=complex)
+                    for i in range(len(t)):
+                        n = int((fc - fb / 2) * (t[i][-1] - t[i][0])) + 1
+                        X_f[i, :n] = (1 + 0j) / (n if n > 0 else 1)
+                    atom = fft.ifft(X_f, axis=1)
+                    atom = np.fft.fftshift(x=atom, axes=1)
+                    return atom
+
             case _:
                 raise ValueError(f"type={type}: 不支持的小波函数类型")
         # ------------------------------------------------------------------------#
         # 标准采样时间轴, 此时N即为基小波离散采样频率
         time = np.linspace(0, 1, N, endpoint=False) - 0.5
-        # 生成不同尺度下的时间轴, 并带入小波解析函数得采样序列
-        time_Diffscale = time / scale.reshape(-1, 1)
-        waveletMat = atom_func(time_Diffscale, **param)  # 时间伸长, 则波形收缩, 频率升高
-        # 归一化
-        if normalized == "能量":  # 缩放前后能量一致
-            waveletMat /= linalg.norm(waveletMat, axis=1, keepdims=True)
-        elif normalized == "幅值":  # 缩放前后频谱峰值一致
-            waveletMat /= scale.reshape(-1, 1)
-        else:  # 缩放前后时域峰值一致
-            pass
         if isPlot:
-            wavelet = waveletMat[0]  # 取scale=1时的小波进行展示
+            wavelet = wavelet_func(time, **param)
             Sig_wavelet = Signal(
                 t_Axis(N=len(wavelet), T=1, t0=-0.5),
                 wavelet,
@@ -379,7 +400,24 @@ class CWTAnalysis(BaseAnalysis):
                 plot.waveform(Sig_wavelet, title="时域波形")
             plot.spectrum(np.abs(Sig_wavelet.to_Spectra().halfCut()), title="频谱", xlim=(0, 100))
             plot.show()
-        return waveletMat
+            return None
+        # 生成不同尺度下的时间轴, 并带入小波解析函数得采样序列
+        if scale is None:
+            scale = np.array([1.0])
+        time_Diffscale = time / scale.reshape(-1, 1)
+        wavelet_Diffscale = wavelet_func(time_Diffscale, **param)  # 时间伸长, 则波形收缩, 频率升高
+        if includeScaling:
+            scale = np.hstack([1, scale])
+            scaling = scaling_func(time / 1, **param)  # scale=1时的尺度函数
+            wavelet_Diffscale = np.vstack([scaling, wavelet_Diffscale])
+        # 归一化
+        if normalized == "能量":  # 缩放前后能量一致
+            wavelet_Diffscale /= linalg.norm(wavelet_Diffscale, axis=1, keepdims=True)
+        elif normalized == "幅值":  # 缩放前后频谱峰值一致
+            wavelet_Diffscale /= scale.reshape(-1, 1)
+        else:  # 缩放前后时域峰值一致
+            pass
+        return wavelet_Diffscale
 
     @BaseAnalysis._plot(spectrogram_PlotFunc)
     def cwt(
@@ -389,6 +427,7 @@ class CWTAnalysis(BaseAnalysis):
         nperoctave: int = 10,
         wavelet: str = "Morlet",
         param: dict = {},
+        includeScaling: bool = True,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         计算信号的连续小波变换时频谱
@@ -413,6 +452,8 @@ class CWTAnalysis(BaseAnalysis):
             - "harmonic": 谐波小波
         param : dict, optional
             基小波函数参数字典, 详见get_wavelet()方法说明
+        includeScaling : bool, default: True
+            时频谱中是否包含尺度函数分量
 
         Returns
         -------
@@ -427,26 +468,30 @@ class CWTAnalysis(BaseAnalysis):
         scale = CWTAnalysis.get_scale(b=2, j=j, v=nperoctave)  # s<=1
         # 生成基小波的离散尺度采样序列
         param.update({"fc": flow / self.Sig.f_axis.df})  # 归一化频率
-        waveletMat = CWTAnalysis.get_wavelet(
+        wavelets = CWTAnalysis.get_wavelet(
             type=wavelet,
             param=param,
             scale=scale,
             N=len(self.Sig),
             normalized="幅值",
+            includeScaling=includeScaling,
         )
         freq = flow / scale
+        if includeScaling:
+            freq = np.hstack([0, freq])
+
         time: np.ndarray = self.Sig.t_axis()
         # 去除中心频率超出fn的尺度
         validIdx = np.where(freq <= self.Sig.t_axis.fs / 2)[0]
-        waveletMat, freq = waveletMat[validIdx, :], freq[validIdx]
+        wavelets, freq = wavelets[validIdx, :], freq[validIdx]
         # ------------------------------------------------------------------------#
         # 滤波法计算CWT谱矩阵: 兼容复小波和实小波
         # 1. 预计算信号的FFT
         data_fft = fft.fft(self.Sig._data)
         # 2. 预计算所有小波核的FFT (同时计算, 利用axis=1向量化)
-        kernels_fft = fft.fft(np.conj(np.flip(waveletMat, axis=1)), axis=1)
+        wavelets_fft = fft.fft(np.conj(np.flip(wavelets, axis=1)), axis=1)
         # 3. 频域相乘 (利用广播: (N,) * (M, N) -> (M, N))
-        Wf_fft = data_fft * kernels_fft
+        Wf_fft = data_fft * wavelets_fft
         # 4. 逆变换回时域
         Wf = fft.ifft(Wf_fft, axis=1)
         # 5. 调整相位/对齐 (FFT卷积是循环卷积, 需要对应 mode='same' 进行移位)
