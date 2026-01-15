@@ -1,7 +1,7 @@
 # /// script
 # requires-python = "==3.11.12"
 # dependencies = [
-#     "marimo",
+#     "marimo>=0.19.0",
 #     "numpy==2.0.0",
 #     "scipy==1.14.0",
 #     "matplotlib==3.9.0",
@@ -79,25 +79,34 @@ def test_CWTAnalysis(Sig):
     assert all(scale[1:] < 1)
     assert len(scale) == 50
     np.testing.assert_allclose(scale[:-1] / scale[1:], 3 ** (1 / 10))
-    # 测试 show_TFcover 方法
-    time = Sig.t_axis()
-    freq = 5 / scale
-    analyzer.show_TFcover(
-        time=time[::10], freq=freq, dfreq=10 / scale, boxArea=1
-    )
     # 测试 get_wavelet 方法
-    waveletMat = analyzer.get_wavelet(
-        type="B-Spline",
-        param={"fc": 5, "fb": 5, "p": 3},
+    wavelettype = "B-Spline"
+    waveletparam = {"fc": 10, "fb": 4, "p": 3}
+    wavelets = analyzer.get_wavelet(
+        type=wavelettype,
+        param=waveletparam,
         scale=scale,
         N=1000,
-        normalize="能量",
+        normalized="能量",
     )
-    assert waveletMat.shape == (50, 1000)
+    assert wavelets.shape == (50, 1000)
+    analyzer.get_wavelet(
+        type=wavelettype,
+        param=waveletparam,
+        isPlot=True,
+    )
+    mo.output.append(plt.gcf())
     # 测试 cwt 方法
-    time, freq, Wf = analyzer.cwt(flow=20, nperoctave=50)
+    time, freq, Wf = analyzer.cwt(flow=10, nperoctave=10)
+    assert freq[0] == 0
+    assert freq[-1] < Sig.t_axis.fs / 2
     assert len(time) == len(Sig)
     assert Wf.shape == (len(time), len(freq))
+    analyzer.isPlot = True
+    analyzer.cwt(
+        flow=20, nperoctave=50, wavelet=wavelettype, param=waveletparam
+    )
+    mo.output.append(plt.gcf())
 
 
 if __name__ == "__main__":
