@@ -96,6 +96,8 @@ class CWTAnalysis(BaseAnalysis):
             基小波不同尺度采样序列, shape=(len(scale), N). 如果includeScaling=True, 则shape=(len(scale)+1, N)
         """
         match type:
+            # 复小波一般使用窗函数法设计, 其中核函数即为尺度函数
+            # 实小波一般无中心频率参数, 适合分析信号奇异性
             case "Morlet":
 
                 def wavelet_func(t, fc=5, fb=5):
@@ -142,7 +144,7 @@ class CWTAnalysis(BaseAnalysis):
                 def scaling_func(t, fc=5, fb=5, p=2):
                     return np.sinc(fb * t / p) ** p
 
-            case "shannon":
+            case "Shannon":
 
                 def wavelet_func(t, fc=5, fb=5):
                     atom = np.sinc(fb * t) * np.exp(1j * 2 * np.pi * fc * t)
@@ -151,7 +153,7 @@ class CWTAnalysis(BaseAnalysis):
                 def scaling_func(t, fc=5, fb=5):
                     return np.sinc(fb * t)
 
-            case "harmonic":
+            case "Harmonic":
 
                 def wavelet_func(t, fc=5, fb=5):
                     X_f = np.zeros_like(t, dtype=complex)
