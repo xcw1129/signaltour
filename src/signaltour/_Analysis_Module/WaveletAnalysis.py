@@ -7,26 +7,38 @@
 
     - class:
         - `CWTAnalysis`: 连续小波变换 (Continuous Wavelet Transform, CWT) 分析类
+        - `DWTAnalysis`: 离散小波变换 (Discrete Wavelet Transform, DWT) 分析类
 """
 
-__all__ = ["CWTAnalysis"]
+__all__ = ["CWTAnalysis", "DWTAnalysis"]
 
-from .._Assist_Module.Dependencies import Optional, fft, linalg, np
+from .._Assist_Module.Dependencies import Dict, List, Optional, fft, linalg, np, signal
 from .._Plot_Module.ImagePlot import spectrogram_PlotFunc
 from .._Plot_Module.LinePlot import LinePlot
 from .._Signal_Module.core import Signal, t_Axis
 from .core import BaseAnalysis
-
+from .ModeAnalysis import decResult_PlotFunc
 
 # --------------------------------------------------------------------------------------------#
 # --------------------------------------------------------------------------------#
 # ------------------------------------------------------------------------#
 # ----------------------------------------------------------------#
+
+
 class CWTAnalysis(BaseAnalysis):
     """
     连续小波变换 (Continuous Wavelet Transform, CWT) 分析类
 
-    用于分析非平稳尺度变化信号的时间-尺度特性, 提供多种尺度伸缩方案和小波函数选择
+    用于分析非平稳尺度变化信号的时频分布特性, 提供多种尺度伸缩方案和小波函数选择
+
+    Attributes
+    ----------
+    Sig : Signal
+        待分析信号
+    isPlot : bool
+        是否绘制分析结果图
+    plot_kwargs : dict
+        自定义绘图参数
 
     Methods
     -------
@@ -51,7 +63,7 @@ class CWTAnalysis(BaseAnalysis):
         return scale
 
     @staticmethod
-    def get_wavelet(
+    def get_wavelets_discrete(
         type: str,
         param: dict = {},
         scale: Optional[np.ndarray] = None,
@@ -61,7 +73,7 @@ class CWTAnalysis(BaseAnalysis):
         isPlot: bool = False,
     ) -> np.ndarray | None:
         """
-        生成指定参数基小波在不同尺度下的采样序列
+        生成指定参数基小波在不同离散尺度下的时间离散采样序列
 
         函数内部自动设置各基小波的剩余参数, 使得基小波支撑集恰好为[-0.5, 0.5]
 
@@ -268,7 +280,7 @@ class CWTAnalysis(BaseAnalysis):
         scale = CWTAnalysis.get_scale(b=2, j=j, v=nperoctave)  # s<=1
         # 生成基小波的离散尺度采样序列
         param.update({"fc": flow / self.Sig.f_axis.df})  # 归一化频率
-        wavelets = CWTAnalysis.get_wavelet(
+        wavelets = CWTAnalysis.get_wavelets_discrete(
             type=wavelet,
             param=param,
             scale=scale,
@@ -299,3 +311,118 @@ class CWTAnalysis(BaseAnalysis):
         if self.isPlot:
             return time, freq, np.abs(Wf) if np.iscomplexobj(Wf) else Wf
         return time, freq, Wf
+
+
+class DWTAnalysis(BaseAnalysis):
+    """
+    离散小波变换 (Discrete Wavelet Transform, DWT) 分析类
+
+    用于分析离散信号在小波框架下的表示和多分辨率特性, 支持基于 Mallat 算法的正交小波变换
+
+    Attributes
+    ----------
+    Sig : Signal
+        待分析信号
+    isPlot : bool
+        是否绘制分析结果图
+    plot_kwargs : dict
+        自定义绘图参数
+    """
+
+    # 正交小波基对应镜像共轭滤波器组(Conjugate Mirror Filters)低通滤波器系数
+    ORTHWAVELET_CMF: Dict[str, np.ndarray] = {
+        "haar": np.array([1, 1]) / np.sqrt(2),
+        "db1": np.array([1, 1]) / np.sqrt(2),
+        "db2": np.array([0.4829629131445341, 0.8365163037378077, 0.2241438680420134, -0.1294095225512603]),
+        "db3": np.array(
+            [
+                0.3326705529500825,
+                0.8068915093110924,
+                0.4598775021184914,
+                -0.1350110200102546,
+                -0.0854412738820267,
+                0.0352262918857095,
+            ]
+        ),
+        "db4": np.array(
+            [
+                0.2303778133088962,
+                0.7148465705529154,
+                0.6308807679298587,
+                -0.0279837694168599,
+                -0.1870348117190931,
+                0.0308413818355607,
+                0.0328830116668852,
+                -0.010597401785069,
+            ]
+        ),
+        "sym2": np.array([0.4829629131445341, 0.8365163037378077, 0.2241438680420134, -0.1294095225512603]),
+        "sym3": np.array(
+            [
+                0.3326705529500825,
+                0.8068915093110924,
+                0.4598775021184914,
+                -0.1350110200102546,
+                -0.0854412738820267,
+                0.0352262918857095,
+            ]
+        ),
+    }
+
+    @staticmethod
+    def get_cmf_coeff(type: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """生成指定正交小波的分解滤波器组系数"""
+        name = type.lower()
+        if name not in DWTAnalysis.ORTHWAVELET_CMF:
+            raise ValueError(f"type={type}: 不支持的小波类型. 可用选项: {list(DWTAnalysis.ORTHWAVELET_CMF.keys())}")
+        else:
+            h = DWTAnalysis.ORTHWAVELET_CMF[name]
+        # 共轭镜像滤波器组系数关系: g[n] = (-1)^n * h[L-1-n]
+        L = len(h)
+        g = np.array([(-1) ** n * h[L - 1 - n] for n in range(L)])
+        return h, g
+
+    def deco_once(
+        self, data: np.ndarray, h: np.ndarray, g: np.ndarray, downsampled: bool = True
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """单步共轭滤波分解, 得到下一尺度离散小波变换系数"""
+        approx = signal.oaconvolve(data, h, mode="same")
+        detail = signal.oaconvolve(data, g, mode="same")
+        if downsampled:
+            approx = approx[::2]  # 保持尺度函数的时移正交性
+        return approx, detail
+
+    @BaseAnalysis._plot(decResult_PlotFunc)
+    def dwt(self, wavelet: str, level: int = 10) -> List[Signal]:
+        """
+        基于 Mallat 算法的离散小波变换, 将信号分解为多尺度细节和近似分量
+
+        Returns
+        -------
+        List[Signal]
+            分解结果列表[cD1, CD2, ..., cD_L, cA_L], 标签会自动设置
+        """
+        # 准备
+        h, g = DWTAnalysis.get_cmf_coeff(wavelet)
+        # 递归分解
+        coeffs = []
+        current_a = self.Sig.data  # 初始近似系数为原始信号, fn远高于信号上限频率成分时误差可忽略不计
+        for i in range(level):
+            a, d = self.deco_once(current_a, h, g, downsampled=True)
+            coeffs.append(d)
+            current_a = a
+        coeffs.append(current_a)
+        # 封装结果为Signal对象列表
+        SigList_deco = []
+        for i, data in enumerate(coeffs):
+            if i == level:
+                label = f"近似系数{level}"
+                dt = self.Sig.t_axis.dt * (2**level)
+            else:
+                label = f"细节系数{i + 1}"
+                dt = self.Sig.t_axis.dt * (2 ** (i))
+            Sig_deco = Signal(t_Axis(N=len(data), dt=dt), data, name=self.Sig.name, unit=self.Sig.unit, label=label)
+            SigList_deco.append(Sig_deco)
+        if self.isPlot:
+            return SigList_deco
+        return SigList_deco
