@@ -271,7 +271,7 @@ class CWTAnalysis(BaseAnalysis):
             param=param,
             scale=scale,
             N=len(self.Sig),
-            normalized="能量",
+            normalized="幅值",  # 保持与STFT时频谱一致的幅值尺度
             includeScaling=includeScaling,
         )
         freq = flow / scale
