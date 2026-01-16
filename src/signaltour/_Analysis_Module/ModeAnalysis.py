@@ -19,7 +19,6 @@
 
 __all__ = [
     "siftProcess_PlotFunc",
-    "decResult_PlotFunc",
     "updateProcess_PlotFunc",
     "search_localExtrema",
     "get_spectraCenter",
@@ -27,8 +26,9 @@ __all__ = [
     "EMDAnalysis",
     "VMDAnalysis",
 ]
+
 from .._Assist_Module.Dependencies import Optional, fft, interpolate, np, signal
-from .._Plot_Module.LinePlot import LinePlot, waveform_PlotFunc
+from .._Plot_Module.LinePlot import LinePlot, decResult_PlotFunc, waveform_PlotFunc
 from .._Signal_Module.core import Signal, Spectra, f_Axis
 from .._Signal_Module.SignalSample import pad
 from .core import BaseAnalysis
@@ -109,68 +109,6 @@ def siftProcess_PlotFunc(
     t = Sig.t_axis()
     ax[0].scatter(t[max_idx], Sig.data[max_idx], color="red", marker="x", s=16)
     ax[0].scatter(t[min_idx], Sig.data[min_idx], color="green", marker="x", s=16)
-    fig.show()
-    return fig, ax
-
-
-def decResult_PlotFunc(
-    Sig_imf_list: list,
-    **kwargs,
-) -> tuple:
-    """
-    绘制 EMD/VMD 分解结果的辅助图像
-
-    Parameters
-    ----------
-    Sig_imf_list : list[Signal]
-        模态信号对象列表, 每一项为一个 `Signal`; 对于 EMD, 列表最后一项通常为残余模态
-    **kwargs : dict, 可选
-        传递给绘图函数的其他关键字参数
-
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-        绘制的图对象
-    ax : list
-        子图坐标轴对象列表
-
-    Notes
-    -----
-    函数以两列布局依次绘制各模态的时域波形, 并设置整体标题为 "分解结果"。
-    """
-    # 计算原始信号
-    data = np.sum(Sig_imf_list, axis=0)
-    Sig = Signal(
-        Sig_imf_list[0].t_axis.copy(),
-        data,
-        name=Sig_imf_list[0].name,
-        unit=Sig_imf_list[0].unit,
-        label="原始信号",
-    )
-    Amp = np.abs(fft.fft(Sig) / len(Sig))
-    Spc = Spectra(Sig.f_axis, Amp, name="幅值", unit=Sig.unit, label=Sig.label).halfCut()
-    # 自动设置ylim
-    ylim_Sig = (
-        np.min(Sig) - 0.1 * np.ptp(Sig),
-        np.max(Sig) + 0.1 * np.ptp(Sig),
-    )  # 设置与原始信号相同的ylim
-    ylim_Spc = (0, np.max(Spc) * 1.1)  # 设置频谱y轴范围为110%
-    # 绘制分解结果
-    plot = LinePlot(ncols=2, **kwargs)
-    # 绘制原始信号
-    plot.waveform(Sig, title="原始信号时域波形", ylim=ylim_Sig)
-    plot.waveform(Spc, title="原始信号幅值谱", ylim=ylim_Spc)
-    # 绘制各模态信号
-    for Sig_imf in Sig_imf_list:
-        # 绘制时域波形
-        plot.waveform(Sig_imf, title=f"{Sig_imf.label}时域波形", ylim=ylim_Sig)
-        # 绘制频谱
-        Amp = np.abs(fft.fft(Sig_imf) / len(Sig_imf))
-        Spc_imf = Spectra(Sig.f_axis, Amp, name="幅值", unit=Sig.unit, label=Sig_imf.label).halfCut()
-        plot.waveform(Spc_imf, title=f"{Sig_imf.label}幅值谱", ylim=ylim_Spc)
-
-    fig, ax = plot.show(pattern="return")
-    fig.suptitle("分解结果", y=1)
     fig.show()
     return fig, ax
 
