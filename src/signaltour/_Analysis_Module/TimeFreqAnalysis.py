@@ -10,7 +10,7 @@
         - `WVDAnalysis`: 魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类
 """
 
-__all__ = ["STFTAnalysis", "WVDAnalysis", "CWTAnalysis"]
+__all__ = ["STFTAnalysis", "WVDAnalysis"]
 
 from .._Assist_Module.Dependencies import Optional, fft, np, signal
 from .._Plot_Module.ImagePlot import spectrogram_PlotFunc
@@ -18,7 +18,6 @@ from .._Signal_Module.core import Signal
 from .._Signal_Module.SignalSample import slice
 from .core import BaseAnalysis
 from .SpectrumAnalysis import window
-from .WaveletAnalysis import CWTAnalysis
 
 
 # --------------------------------------------------------------------------------------------#
