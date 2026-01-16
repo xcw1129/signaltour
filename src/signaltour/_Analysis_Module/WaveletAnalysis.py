@@ -46,8 +46,6 @@ class CWTAnalysis(BaseAnalysis):
     @staticmethod
     def get_scale(b: float = 2, j: int = 10, v: int = 1) -> np.ndarray:
         """生成对数分布离散尺度轴, b^(-j)<s<=1"""
-        if b <= 1:
-            raise ValueError("b必须大于1")
         # s=1, b^(-1/v), b^(-2/v),.., b^(-1),..., b^(-2),..., b^(-j)
         scale = 1 / np.logspace(0, j, v * j, endpoint=False, base=b)
         return scale
@@ -236,14 +234,14 @@ class CWTAnalysis(BaseAnalysis):
         ----------
         flow : float, optional
             最小分析频率, 单位Hz
-            默认值为信号频率轴分辨率的10倍
+            默认值为信号频率分辨率的10倍
         fhigh : float, optional
             最大分析频率, 单位Hz
             默认值为信号采样频率的50%(奈奎斯特频率)
         nperoctave : int, default: 10
-            每倍频程的离散尺度数, 控制尺度轴分辨率
+            每倍频程的离散尺度数, 控制时频谱频移不变性和平滑度
         wavelet : str, default: "Morlet"
-            小波函数类型, 支持:
+            基小波类型, 支持:
             - "Morlet": Morlet小波
             - "MexicanHat": Mexican Hat (Ricker)小波
             - "DOG": DOG (Derivative of Gaussian)小波
@@ -251,7 +249,7 @@ class CWTAnalysis(BaseAnalysis):
             - "shannon": Shannon小波
             - "harmonic": 谐波小波
         param : dict, optional
-            基小波函数参数字典, 详见get_wavelet()方法说明
+            基小波函数参数, 详见get_wavelet()方法说明
         includeScaling : bool, default: True
             时频谱中是否包含尺度函数分量
 
@@ -273,7 +271,7 @@ class CWTAnalysis(BaseAnalysis):
             param=param,
             scale=scale,
             N=len(self.Sig),
-            normalized="幅值",
+            normalized="能量",
             includeScaling=includeScaling,
         )
         freq = flow / scale
