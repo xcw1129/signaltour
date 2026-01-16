@@ -12,7 +12,7 @@
 
 __all__ = ["STFTAnalysis", "WVDAnalysis"]
 
-from .._Assist_Module.Dependencies import Optional, fft, np, signal
+from .._Assist_Module.Dependencies import Optional, Tuple, fft, np, signal
 from .._Plot_Module.ImagePlot import spectrogram_PlotFunc
 from .._Signal_Module.core import Signal
 from .._Signal_Module.SignalSample import slice
@@ -35,14 +35,14 @@ class STFTAnalysis(BaseAnalysis):
     - get_segNum(df: Optional[float] = None, dt: Optional[float] = None)
             -> int
         根据期望的频率分辨率df或时间分辨率dt计算合适的分段数
-    - get_segMatrix(Sig: Signal, segNum: int,
-            padTimes: int = 0, winType: str = "汉宁窗")
-            -> tuple[np.ndarray, np.ndarray]
-        将信号切片分段并加窗, 返回分段数据矩阵和段时间轴
-    - stft(df: Optional[float] = None, dt: Optional[float] = None,
-            segNum: int = 101, WinType: str = "汉宁窗")
+
+    - windowSegments(Sig: Signal, segNum: int, overlap: float = 0.5, padTimes: int = 0, winType: str = "汉宁窗")
+            -> Tuple[np.ndarray, np.ndarray]
+        将信号切片分段并加窗
+
+    - stft(df: Optional[float] = None, dt: Optional[float] = None, segNum: Optional[int] = None, winType: str = "汉宁窗")
             -> tuple[np.ndarray, np.ndarray, np.ndarray]
-        计算信号的STFT时频谱, 返回时间轴、频率轴和谱矩阵
+        计算信号的短时傅里叶变换时频谱
     """
 
     def get_segNum(
@@ -83,37 +83,41 @@ class STFTAnalysis(BaseAnalysis):
         return segNum
 
     @staticmethod
-    def get_segMatrix(
-        Sig: Signal, segNum: int, padTimes: int = 0, winType: str = "汉宁窗"
-    ) -> tuple[np.ndarray, np.ndarray]:
+    def windowSegments(
+        Sig: Signal, segNum: int, overlap: float = 0.5, padTimes: int = 0, winType: str = "汉宁窗"
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        将信号切片分段并加窗, 返回分段数据矩阵和段时间轴
+        将信号切片分段并加窗
 
         Parameters
         ----------
         segNum : int
-            分段长度, 影响时频分辨率
+            分段数
+        overlap : float, default: 0.5
+            分段重叠比例, 取值范围[0, 1)
         padTimes : int, default: 0
-            信号分段切片零填充延拓倍数
+            分段零填充延拓倍数
         winType : str, default: "汉宁窗"
             窗函数类型, 支持: "矩形窗", "汉宁窗", "海明窗", "巴特利特窗", "布莱克曼窗", "自定义窗"
 
         Returns
         -------
         (np.ndarray, np.ndarray)
-            分段数据矩阵和每段时间轴
+            分段数据矩阵, 分段时间轴
         """
-        Mat, time = slice(Sig - np.mean(Sig), segNum=segNum, projection=True)  # 默认50%切片重叠, 提高时频分布时移不变性
-        nperseg = Mat.shape[1]
-        Mat = np.pad(
-            Mat,
+        # 分段
+        segments, time = slice(Sig - np.mean(Sig), segNum=segNum, projection=True, overlap=overlap)
+        nperseg = segments.shape[1]
+        # 延拓
+        segments = np.pad(
+            segments,
             ((0, 0), (padTimes * nperseg // 2, padTimes * nperseg // 2)),
             mode="constant",
-        )  # 延拓提高时频分布的频移不变性
-        # 加窗优化能量泄露效应
+        )
+        # 加窗
         win = window(num=nperseg, type=winType, padding=padTimes * nperseg // 2)
-        Mat = Mat * win
-        return Mat, time
+        segments = segments * win
+        return segments, time
 
     @BaseAnalysis._plot(spectrogram_PlotFunc)
     def stft(
@@ -126,6 +130,10 @@ class STFTAnalysis(BaseAnalysis):
         """
         计算信号的短时傅里叶变换时频谱
 
+        一般设置df或dt来控制时频分辨率从而自动计算segNum, 特殊情况直接指定segNum
+
+        默认分段重叠比例为50%, 且3倍延拓, 以提高时频谱的时频位移不变性
+
         Parameters
         ----------
         df : float, optional
@@ -136,17 +144,11 @@ class STFTAnalysis(BaseAnalysis):
             分段长度, 影响时频分辨率
         winType : str, default: "汉宁窗"
             窗函数类型, 支持: "矩形窗", "汉宁窗", "海明窗", "巴特利特窗", "布莱克曼窗", "自定义窗"
-        type : str, default: "幅值谱"
-            谱类型, 支持: "幅值谱", "功率谱"
 
         Returns
         -------
         (np.ndarray, np.ndarray, np.ndarray)
-            时间轴、频率轴和STFT复数谱矩阵
-
-        Notes
-        -----
-        一般设置df或dt来控制时频分辨率从而自动计算segNum, 特殊情况直接指定segNum
+            时间轴, 频率轴和STFT复数谱矩阵
         """
         # 根据要求的时频分辨率自动确定分段数
         auto_segNum = self.get_segNum(df=df, dt=dt)
@@ -156,21 +158,22 @@ class STFTAnalysis(BaseAnalysis):
         else:
             segNum = auto_segNum
         # 信号分段切片与加窗
-        Mat, time = STFTAnalysis.get_segMatrix(Sig=self.Sig, segNum=segNum, padTimes=3, winType=winType)
-        # 计算每帧FFT
-        S = fft.fft(Mat, axis=1)
-        # 生成频率轴
-        freq = np.linspace(0, self.Sig.t_axis.fs, S.shape[1], endpoint=False)
+        segments, time = STFTAnalysis.windowSegments(
+            Sig=self.Sig, segNum=segNum, overlap=0.5, padTimes=3, winType=winType
+        )
+        # 单独计算所有分段的FFT, 此时分段存在线性相移项
+        Sf = fft.fft(segments, axis=1)
+        freq = np.linspace(0, self.Sig.t_axis.fs, Sf.shape[1], endpoint=False)  # 生成频率轴
         if self.isPlot:
-            return time, freq[: S.shape[1] // 2], 2 * np.abs(S[:, : S.shape[1] // 2])
-        return time, freq, S
+            return time, freq[: Sf.shape[1] // 2], 2 * np.abs(Sf[:, : Sf.shape[1] // 2])
+        return time, freq, Sf
 
 
 class WVDAnalysis(BaseAnalysis):
     """
     魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类
 
-    用于计算信号的Cohen类双线性时频分布, 具有高时频分辨率但存在交叉项
+    用于计算信号的时频能量概率分布, 具有高时频分辨率但存在交叉项
 
     Methods
     -------
@@ -187,13 +190,12 @@ class WVDAnalysis(BaseAnalysis):
         Parameters
         ----------
         dt : float, optional
-            期望的时间分辨率, 单位s
-            若指定则对信号进行跳步自相关以加快计算速度
+            期望的时间分辨率, 单位s. 若指定则对信号进行跳步自相关以加快计算速度
 
         Returns
         -------
         (np.ndarray, np.ndarray, np.ndarray)
-            时间轴、频率轴和WVD实数谱矩阵
+            时间轴, 频率轴, WVD实数谱矩阵
         """
         # 根据要求的时间分辨率计算nhop
         nhop = 1
@@ -208,13 +210,13 @@ class WVDAnalysis(BaseAnalysis):
         # 组合时延数据矩阵
         N_t_stride = (N - 1) // nhop + 1
         # 0维为时延轴, 1维为时间轴
-        W = np.zeros((N, N_t_stride), dtype=complex)  # N=8192占用1G内存, 并降低到1/nhop
+        Wf = np.zeros((N, N_t_stride), dtype=complex)  # N=8192占用1G内存, 并降低到1/nhop
         for n_tau in range(N):
             # 左右各移动tau/2, 共移动tau
             seg = analytic_right[n_tau : n_tau + N] * np.conj(analytic_left[N - n_tau : N - n_tau + N])
-            W[n_tau, :] = seg[::nhop]  # 跨步长采样
+            Wf[n_tau, :] = seg[::nhop]  # 跨步长采样
         # 沿时延轴FFT
-        W = (fft.fft(W, axis=0).real / N).T  # 对0维(时延轴)做FFT, 转置后0维为时间轴, 1维为频率轴
+        Wf = (fft.fft(Wf, axis=0).real / N).T  # 对0维(时延轴)做FFT, 转置后0维为时间轴, 1维为频率轴
         time = self.Sig.t_axis()[::nhop]
         freq = np.arange(N) * (self.Sig.f_axis.df / 2)
-        return time, freq, W
+        return time, freq, Wf
