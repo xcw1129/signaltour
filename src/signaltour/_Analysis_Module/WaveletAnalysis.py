@@ -506,7 +506,8 @@ class DWTAnalysis(BaseAnalysis):
         approx = signal.oaconvolve(data, h, mode="same")
         detail = signal.oaconvolve(data, g, mode="same")
         if downsampled:
-            approx = approx[::2]  # 保持尺度函数的时移正交性
+            approx = approx[::2]
+            detail = detail[::2]
         return approx, detail
 
     def __convert_Signal(self, coeffs: np.ndarray) -> List[Signal]:
@@ -519,7 +520,7 @@ class DWTAnalysis(BaseAnalysis):
                 dt = self.Sig.t_axis.dt * (2**level)
             else:
                 label = f"细节系数{i + 1}"
-                dt = self.Sig.t_axis.dt * (2 ** (i))
+                dt = self.Sig.t_axis.dt * (2 ** (i + 1))
             Sig_deco = Signal(t_Axis(N=len(data), dt=dt), data, name=self.Sig.name, unit=self.Sig.unit, label=label)
             SigList_deco.append(Sig_deco)
         return SigList_deco
