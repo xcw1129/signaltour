@@ -385,7 +385,7 @@ class BasePlot:
         ylabel = task_kwargs.get("ylabel")
         ax.set_ylabel(ylabel)
         # 设置Y轴刻度格式
-        yscale = task_kwargs.get("yscale", "linear")
+        yscale = task_kwargs.get("yscale") or "linear"
         ax.set_yscale(yscale)
         # 设置Y轴范围
         ax.margins(y=0)  # 设置为0, 以获取数据范围

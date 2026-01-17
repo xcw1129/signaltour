@@ -93,7 +93,7 @@ class ImagePlot(BasePlot):
         # 时频谱图绘制函数: 通过任务队列传递到绘图引擎
         def _draw_spectrogram_imshow(ax, data, kwargs):
             Matrix = data.get("Matrix")
-            kwargs_imshow = kwargs.get("imshow", {})
+            kwargs_imshow = kwargs.get("imshow") or {}
             ax.imshow(
                 Matrix.T,  # 时间行转置为列, 符合时频图习惯
                 **kwargs_imshow,
@@ -102,7 +102,7 @@ class ImagePlot(BasePlot):
         def _draw_spectrogram_pcolormesh(ax, data, kwargs):
             Matrix = data.get("Matrix")
             axis1, axis2 = data.get("axis1"), data.get("axis2")
-            kwargs_pcolormesh = kwargs.get("pcolormesh", {})
+            kwargs_pcolormesh = kwargs.get("pcolormesh") or {}
             time, freq = np.meshgrid(axis1, axis2)
             ax.pcolormesh(
                 time,

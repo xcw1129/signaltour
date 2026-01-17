@@ -149,12 +149,12 @@ class LinePlot(BasePlot):
         def _draw_waveform(ax, data, kwargs):
             SigList = data.get("SigList")
             for Sig in SigList:
-                kwargs_plot = kwargs.get("plot", {})
+                kwargs_plot = kwargs.get("plot") or {}
                 ax.plot(
                     Sig._axis(),
                     Sig.data,
                     label=Sig.label,
-                    **kwargs_plot.get(Sig.label, {}),
+                    **kwargs_plot.get(Sig.label) or {},
                 )
             if len(SigList) > 1:
                 ax.legend(loc="best")
@@ -203,9 +203,9 @@ class LinePlot(BasePlot):
         # 绘制函数: 通过任务队列传递
         def _draw_spectrum(ax, data, kwargs):
             Spc = data["Spc"]
-            kwargs_plot = kwargs.get("plot", {})
+            kwargs_plot = kwargs.get("plot") or {}
             f, d = Spc.f_axis(), Spc.data.real  # 取实部舍去计算误差
-            ax.plot(f, d, **kwargs_plot.get(Spc.label, {}))
+            ax.plot(f, d, **kwargs_plot.get(Spc.label) or {})
 
         # ------------------------------------------------------------------------------------#
         # 绘制设置
@@ -222,14 +222,14 @@ class LinePlot(BasePlot):
         if isFindPeaks:
             task_plugins.append(
                 PeakfinderPlugin(
-                    threshold=task_kwargs.get("plugin_threshold", 0.85),
-                    distance=task_kwargs.get("plugin_distance", 0.01),
+                    threshold=task_kwargs.get("plugin_threshold") or 0.85,
+                    distance=task_kwargs.get("plugin_distance") or 0.01,
                 )
             )
         if isPosNeg:
             task_plugins.append(
                 PosNagMaskPlugin(
-                    sensitivity=task_kwargs.get("plugin_sensitivity", 0.05),
+                    sensitivity=task_kwargs.get("plugin_sensitivity") or 0.05,
                 )
             )
         # ------------------------------------------------------------------------------------#
@@ -260,7 +260,7 @@ class LinePlot(BasePlot):
                 data["trends"],
                 data["errors"],
             )
-            kwargs_plot = kwargs.get("plot", {})
+            kwargs_plot = kwargs.get("plot") or {}
             marker_list = ["o", "s", "^", "D", "*"]
             for idx, trend in enumerate(trends):
                 err = errors[idx] if errors is not None else None
@@ -272,7 +272,7 @@ class LinePlot(BasePlot):
                     ecolor="gray",
                     label=trend.label,
                     marker=marker_list[idx % len(marker_list)],
-                    **kwargs_plot.get(trend.label, {}),
+                    **kwargs_plot.get(trend.label) or {},
                 )
             ax.legend(loc="best")
 
@@ -304,7 +304,7 @@ class LinePlot(BasePlot):
         # 绘制函数: 通过任务队列传递
         def _draw_orbit(ax, data, kwargs):
             Srs_X, Srs_Y = data["Srs_X"], data["Srs_Y"]
-            kwargs_plot = kwargs.get("plot", {})
+            kwargs_plot = kwargs.get("plot") or {}
             ax.plot(
                 Srs_X._data,
                 Srs_Y._data,
