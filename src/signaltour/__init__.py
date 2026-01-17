@@ -12,7 +12,7 @@
         统计趋势分析、谱分析、非平稳特性分析和模态分析等信号分析模块
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 from . import Signal, Plot, Analysis  # noqa: I001
 

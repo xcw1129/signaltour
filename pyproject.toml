@@ -2,7 +2,7 @@
 # 项目运行环境配置
 [project]
 name = "signaltour"
-version = "1.0.1"
+version = "1.1.0"
 authors = [
     {name = "Xiong Chengwen", email = "xiongcw1129@gmail.com"},
 ]
