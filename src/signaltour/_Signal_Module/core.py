@@ -16,7 +16,7 @@
 
 __all__ = ["Axis", "Series", "t_Axis", "f_Axis", "Signal", "Spectra"]
 
-from .._Assist_Module.Dependencies import NDArrayOperatorsMixin, Optional, Self, Tuple, deepcopy, fft, np, re
+from .._Assist_Module.Dependencies import NDArrayOperatorsMixin, Optional, Self, Tuple, deepcopy, np, re
 
 
 # --------------------------------------------------------------------------------------------#
@@ -433,9 +433,9 @@ class Series(NDArrayOperatorsMixin):
 
     def plot(self, **kwargs) -> Tuple:
         """绘制序列数据的波形图"""
-        from .._Plot_Module.LinePlot import waveform_PlotFunc
+        from .._Plot_Module.LinePlot import PlotFunc_waveform
 
-        fig, ax = waveform_PlotFunc(self, **kwargs)
+        fig, ax = PlotFunc_waveform(self, **kwargs)
         return fig, ax
 
     def template(self, data: Optional[np.ndarray] = None) -> Self:
@@ -742,21 +742,19 @@ class Signal(Series):
     # 自带方法
     def plot(self, **kwargs) -> Tuple:
         """绘制信号的时域波形图"""
-        from .._Plot_Module.LinePlot import waveform_PlotFunc
+        from .._Plot_Module.LinePlot import PlotFunc_waveform
 
-        fig, ax = waveform_PlotFunc(self, **kwargs)
+        fig, ax = PlotFunc_waveform(self, **kwargs)
         return fig, ax
 
-    def to_Spectra(self) -> "Spectra":
+    def to_Spectra(self, density: bool = False) -> "Spectra":
         """生成信号的频谱"""
-        X_f = fft.fft(self._data)
-        Spc = Spectra(
-            axis=self.f_axis,
-            data=X_f,
-            name=self.name,
-            unit=self.unit,
-            label=self.label,
-        )
+        from .._Analysis_Module.SpectrumAnalysis import SpectrumAnalysis
+
+        if density:
+            Spc = SpectrumAnalysis(self).ft()
+        else:
+            Spc = SpectrumAnalysis(self).cft(padTimes=0)  # 保持原始长度, 不延拓
         return Spc
 
 
@@ -830,9 +828,9 @@ class Spectra(Series):
     # 自带方法
     def plot(self, **kwargs) -> Tuple:
         """绘制频谱"""
-        from .._Plot_Module.LinePlot import spectrum_PlotFunc
+        from .._Plot_Module.LinePlot import PlotFunc_spectrum
 
-        fig, ax = spectrum_PlotFunc(self, **kwargs)
+        fig, ax = PlotFunc_spectrum(self, **kwargs)
         return fig, ax
 
     def halfCut(self) -> "Spectra":

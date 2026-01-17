@@ -18,12 +18,16 @@ from .._Assist_Module.Dependencies import (
     cycler,
     deque,
     font_manager,
+    logging,
     np,
     os,
     plt,
     shallowcopy,
     ticker,
 )
+
+# 初始化日志记录器
+logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------------------------#
@@ -84,18 +88,30 @@ class BasePlot:
 
     Methods
     -------
-    init_Plot_rcParams(scheme: str = "default") -> None
+    - init_Plot_rcParams(scheme: str = "default")
+            -> None
         设置绘图风格配置方案, 并保存原始配置用于恢复
-    restore_User_rcParams() -> None
+
+    - restore_User_rcParams()
+            -> None
         恢复原始绘图风格配置方案
-    set_params_to_task(**kwargs) -> "Plot"
+
+    - set_params_to_task(**kwargs)
+            -> Self
         为最新添加的绘图任务设置专属参数
-    add_plugin_to_task(plugin: PlotPlugin) -> "Plot"
+
+    - add_plugin_to_task(plugin: PlotPlugin)
+            -> Self
         为最新添加的绘图任务添加一个插件
-    show(pattern: str = "plot", filename="Plot.png", save_format="png") -> tuple
+
+    - show(pattern: str = "plot", filename="Plot.png", save_format="png")
+            -> tuple
         执行所有已注册的绘图任务并显示/返回/保存最终图形
-    canvas() -> tuple
+
+    - canvas()
+            -> tuple
         生成当前绘图对象的空白画布
+
     """
 
     def __init__(
@@ -130,8 +146,8 @@ class BasePlot:
         self.autoRestore = autoRestore  # 是否自动恢复用户原始rcParams配置
         self.ncols = ncols  # 多图绘制时的子图列数
         self.figsize = figsize  # 所有子图共享的图形大小
-        self.kwargs = kwargs  # 全局绘图参数, 一般初始化后不再修改
-        self.tasks = deque()  # 绘图任务队列, 存储所有待绘制图形相关信息
+        self.kwargs = kwargs  # 类实例全局绘图参数, 一般初始化后不再修改
+        self.tasks = deque()  # 类实例绘图任务队列, 存储所有待绘制图形相关信息
 
     @property
     def last_task(self) -> dict:
@@ -341,7 +357,7 @@ class BasePlot:
         # 设置X轴范围
         ax.margins(x=0)  # 设置X轴出血边边距为0
         cur_xlim = ax.get_xlim()
-        xlim = task_kwargs.get("xlim", cur_xlim)
+        xlim = task_kwargs.get("xlim") or cur_xlim
         if xticks_IS_STR:
             ax.set_xlim(-0.5, len(labeltexts) - 0.5)  # 字符串刻度左右各留0.5个单位的边距
         else:
@@ -376,8 +392,8 @@ class BasePlot:
         cur_ylim = ax.get_ylim()
         if yscale == "log":
             cur_ylim = (max(cur_ylim[0], 1e-8), max(cur_ylim[1], 1e-8))
-        true_ylim = task_kwargs.get("ylim", cur_ylim)
-        ymargin = task_kwargs.get("ymargin", 0.1)
+        true_ylim = task_kwargs.get("ylim") or cur_ylim
+        ymargin = task_kwargs.get("ymargin") or 0.1
         if yscale == "log":
             # 对数坐标下, 按对数比例设置出血边
             log_min = np.log10(true_ylim[0])
@@ -405,7 +421,7 @@ class BasePlot:
             if yticks is not None:
                 ax.set_yticks(yticks)
             else:
-                ybins = task_kwargs.get("ybins", 5)
+                ybins = task_kwargs.get("ybins") or 5
                 # 设置指定数量的均匀分布刻度
                 yticks = np.linspace(
                     true_ylim[0],
@@ -529,7 +545,7 @@ class BasePlot:
                 for plugin in task_plugins:
                     plugin._apply(task_ax, task_data)
             except Exception as e:
-                print(f"绘制第{i + 1}个子图(function={task_function.__name__})时发生错误: {e}")
+                logger.warning(f"绘制第{i + 1}个子图(function={task_function.__name__})时发生错误: {e}")
         # ------------------------------------------------------------------------#
         # 总图后处理
         self.figure.tight_layout()

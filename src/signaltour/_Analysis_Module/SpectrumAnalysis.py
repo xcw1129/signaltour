@@ -19,7 +19,7 @@ __all__ = [
 ]
 
 from .._Assist_Module.Dependencies import Callable, Optional, fft, linalg, np, signal
-from .._Plot_Module.LinePlot import spectrum_PlotFunc
+from .._Plot_Module.LinePlot import PlotFunc_spectrum
 from .._Signal_Module.core import Signal, Spectra, f_Axis
 from .core import BaseAnalysis
 
@@ -339,7 +339,7 @@ class SpectrumAnalysis(BaseAnalysis):
         x_n = fft.ifft(data)
         return x_n
 
-    @BaseAnalysis._plot(spectrum_PlotFunc)
+    @BaseAnalysis._plot(PlotFunc_spectrum)
     def ft(self, symmetric: bool = False) -> Spectra:
         """计算能量信号在0~N/2*Δf范围傅里叶变换的离散近似"""
         # 计算傅里叶变换: FT=DFT*Δt
@@ -361,7 +361,7 @@ class SpectrumAnalysis(BaseAnalysis):
             return np.abs(Spc)
         return Spc
 
-    @BaseAnalysis._plot(spectrum_PlotFunc)
+    @BaseAnalysis._plot(PlotFunc_spectrum)
     def cft(self, winType: str = "汉宁窗", padTimes: int = 3) -> Spectra:
         """
         计算功率信号在0~N/2*Δf范围傅里叶级数系数的离散近似
@@ -400,7 +400,7 @@ class SpectrumAnalysis(BaseAnalysis):
 
     # ----------------------------------------------------------------------------------------#
     # 噪声信号谱估计方法
-    @BaseAnalysis._plot(spectrum_PlotFunc)
+    @BaseAnalysis._plot(PlotFunc_spectrum)
     def psd(self, averageTimes: int = 10, type: str = "功率") -> Spectra:
         """
         估计带噪声功率信号在0~N/2*Δf范围的功率分布
@@ -436,7 +436,7 @@ class SpectrumAnalysis(BaseAnalysis):
 
     # ----------------------------------------------------------------------------------------#
     # 其它平稳谱分析方法
-    @BaseAnalysis._plot(spectrum_PlotFunc)
+    @BaseAnalysis._plot(PlotFunc_spectrum)
     def enveSpectra(self) -> Spectra:
         """计算信号的希尔伯特包络幅值谱"""
         # 计算包络幅值
@@ -448,7 +448,7 @@ class SpectrumAnalysis(BaseAnalysis):
         Spc_Amp.name = "包络幅值"
         return Spc_Amp
 
-    @BaseAnalysis._plot(spectrum_PlotFunc)
+    @BaseAnalysis._plot(PlotFunc_spectrum)
     def DiffSpectra(
         self,
         Sig_ref: Signal,

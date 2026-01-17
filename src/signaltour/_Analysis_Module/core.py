@@ -63,25 +63,23 @@ class BaseAnalysis:
         self.plot_kwargs = kwargs
 
     @staticmethod
-    def _plot(plot_func: Callable) -> Callable:
+    def _plot(PlotFunc: Callable) -> Callable:
         """
         Analysis类专用绘图装饰器, 对方法运行结果进行绘图
 
+        若 .isPlot=False, 则直接返回被装饰方法的结果
+
+        若 .isPlot=True, 则调用 PlotFunc 进行绘图, 且不返回结果
+
         Parameters
         ----------
-        plot_func : callable
+        PlotFunc : callable
             执行绘图操作的函数, 需与被装饰方法的返回值格式兼容
 
         Returns
         -------
         callable
             装饰器函数
-
-        Notes
-        -----
-        若 `isPlot`=False, 则直接返回被装饰方法的结果
-
-        若 `isPlot`=True, 则调用 `plot_func` 进行绘图, 并不返回结果
         """
 
         def decorator(func):
@@ -89,11 +87,11 @@ class BaseAnalysis:
                 plot_args = func(self, *args, **kwargs)
                 if not self.isPlot:
                     return plot_args  # 不进行绘图, 直接返回结果
-                # 需确保被装饰函数返回值格式与plot_func输入参数格式一致
+                # 需确保被装饰函数返回值格式与PlotFunc输入参数格式一致
                 if isinstance(plot_args, Tuple):
-                    plot_func(*plot_args, **self.plot_kwargs)
+                    PlotFunc(*plot_args, **self.plot_kwargs)
                 else:
-                    plot_func(plot_args, **self.plot_kwargs)
+                    PlotFunc(plot_args, **self.plot_kwargs)
                 return None  # 绘图则不返回结果
 
             return wrapper

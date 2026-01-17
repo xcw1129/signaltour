@@ -17,7 +17,7 @@ from .._Plot_Module.ImagePlot import spectrogram_PlotFunc
 from .._Plot_Module.LinePlot import LinePlot
 from .._Signal_Module.core import Signal, t_Axis
 from .core import BaseAnalysis
-from .ModeAnalysis import decResult_PlotFunc
+from .ModeAnalysis import PlotFunc_decResult
 
 # --------------------------------------------------------------------------------------------#
 # --------------------------------------------------------------------------------#
@@ -392,7 +392,7 @@ class DWTAnalysis(BaseAnalysis):
             approx = approx[::2]  # 保持尺度函数的时移正交性
         return approx, detail
 
-    @BaseAnalysis._plot(decResult_PlotFunc)
+    @BaseAnalysis._plot(PlotFunc_decResult)
     def dwt(self, wavelet: str, level: int = 10) -> List[Signal]:
         """
         基于 Mallat 算法的离散小波变换, 将信号分解为多尺度细节和近似分量

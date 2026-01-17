@@ -12,7 +12,7 @@
 __all__ = ["StatsTrendAnalysis"]
 
 from .._Assist_Module.Dependencies import Optional, np, stats
-from .._Plot_Module.LinePlot import waveform_PlotFunc
+from .._Plot_Module.LinePlot import PlotFunc_waveform
 from .._Signal_Module.core import Series, t_Axis
 from .._Signal_Module.SignalSample import slice
 from .core import BaseAnalysis
@@ -44,7 +44,7 @@ class StatsTrendAnalysis(BaseAnalysis):
         滑窗法计算信号指定统计值的时域趋势
     """
 
-    @BaseAnalysis._plot(waveform_PlotFunc)
+    @BaseAnalysis._plot(PlotFunc_waveform)
     def trend(self, type: str, segNum: Optional[int] = None, tperseg: Optional[float] = None) -> Series:
         """
         滑窗法计算信号指定统计值的时域趋势

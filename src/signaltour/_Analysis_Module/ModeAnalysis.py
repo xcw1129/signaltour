@@ -28,7 +28,7 @@ __all__ = [
 ]
 
 from .._Assist_Module.Dependencies import Optional, fft, interpolate, np, signal
-from .._Plot_Module.LinePlot import LinePlot, decResult_PlotFunc, waveform_PlotFunc
+from .._Plot_Module.LinePlot import LinePlot, PlotFunc_decResult, PlotFunc_waveform
 from .._Signal_Module.core import Signal, Spectra, f_Axis
 from .._Signal_Module.SignalSample import pad
 from .core import BaseAnalysis
@@ -374,7 +374,7 @@ class EMDAnalysis(BaseAnalysis):
 
     # ----------------------------------------------------------------------------------------#
     # 类主接口
-    @BaseAnalysis._plot(decResult_PlotFunc)
+    @BaseAnalysis._plot(PlotFunc_decResult)
     def emd(self, decNum: int = 5, weakness: float = 1e-2) -> tuple:
         """
         执行 EMD 分解, 逐步提取 IMF 并更新残余模态
@@ -412,7 +412,7 @@ class EMDAnalysis(BaseAnalysis):
 
     # ----------------------------------------------------------------------------------------#
     # 类辅助接口
-    @BaseAnalysis._plot(waveform_PlotFunc)
+    @BaseAnalysis._plot(PlotFunc_waveform)
     def extract_imf(
         self,
         Sig: Signal,
@@ -608,7 +608,7 @@ class VMDAnalysis(BaseAnalysis):
 
     # ----------------------------------------------------------------------------------------#
     # 主接口
-    @BaseAnalysis._plot(decResult_PlotFunc)
+    @BaseAnalysis._plot(PlotFunc_decResult)
     def vmd(
         self,
         decNum: int,

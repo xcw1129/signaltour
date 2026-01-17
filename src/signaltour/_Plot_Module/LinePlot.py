@@ -14,8 +14,9 @@
 
 __all__ = [
     "LinePlot",
-    "waveform_PlotFunc",
-    "spectrum_PlotFunc",
+    "PlotFunc_waveform",
+    "PlotFunc_spectrum",
+    "PlotFunc_decResult",
 ]
 
 from .._Assist_Module.Dependencies import List, Optional, Self, np
@@ -33,12 +34,70 @@ class LinePlot(BasePlot):
     """
     波形图、谱图等一维线条图绘制绘图类
 
+    Attributes
+    ----------
+    figure : plt.Figure
+        当前绘图流程操作的 Figure 对象
+    axs : np.ndarray
+        当前绘图流程操作的 Axes 对象二维数组
+    title : str
+        总图标题
+    scheme : str
+        绘图风格配置方案
+    autoRestore : bool
+        是否自动恢复用户原始rcParams配置
+    ncols : int
+        多图绘制时的子图列数
+    figsize : tuple
+        所有子图共享的图形大小
+    kwargs : dict
+        全局绘图参数, 一般初始化后不再修改
+    tasks : deque
+        绘图任务队列, 存储所有待绘制图形相关信息
+    last_task : dict
+        最新添加的绘图任务
+
     Methods
     -------
-    waveform(Srs: Series | List[Series], **kwargs) -> LinePlot
-        注册一个时域波形图的绘制任务
-    spectrum(Spc: Spectra, **kwargs) -> LinePlot
-        注册一个谱图的绘制任务
+    - init_Plot_rcParams(scheme: str = "default")
+            -> None
+        设置绘图风格配置方案, 并保存原始配置用于恢复
+
+    - restore_User_rcParams()
+            -> None
+        恢复原始绘图风格配置方案
+
+    - set_params_to_task(**kwargs)
+            -> Self
+        为最新添加的绘图任务设置专属参数
+
+    - add_plugin_to_task(plugin: PlotPlugin)
+            -> Self
+        为最新添加的绘图任务添加一个插件
+
+    - show(pattern: str = "plot", filename="Plot.png", save_format="png")
+            -> tuple
+        执行所有已注册的绘图任务并显示/返回/保存最终图形
+
+    - canvas()
+            -> tuple
+        生成当前绘图对象的空白画布
+
+    - waveform(Srs: Series | List[Series], **kwargs)
+            -> Self
+        信号时域波形图绘制函数
+
+    - spectrum(Spc: Spectra, **kwargs)
+            -> Self
+        频谱绘制函数
+
+    - trendsCompare(conditions: list, trends: List[Series], errors: Optional[Series] = None, **kwargs)
+            -> Self
+        趋势线条对比图绘制函数
+
+    - orbit(Srs_X: Series, Srs_Y: Series, **kwargs)
+            -> Self
+        平面轨迹图绘制函数
     """
 
     def __init__(
@@ -51,19 +110,19 @@ class LinePlot(BasePlot):
         **kwargs,
     ):
         """
-        波形图、谱图等一维线条图绘制绘图类
+        波形图、谱图等一维线条图绘制方法类
 
         Parameters
         ----------
         title : str, default: ""
             总图标题
-        scheme : str, default: "default"
+        scheme : str, default: "LinePlot1"
             绘图风格配置方案
         autoRestore : bool, default: True
             是否自动恢复用户原始rcParams配置
         ncols : int, default: 1
             多图绘制时的子图列数
-        figsize : Optional
+        figsize : Optional[tuple]
             所有子图共享的图形大小
         """
         super().__init__(
@@ -75,62 +134,50 @@ class LinePlot(BasePlot):
             **kwargs,
         )
 
-    def waveform(self, Srs: Series | List[Series], **kwargs) -> "LinePlot":
+    def waveform(self, Sig: Signal | List[Signal], **kwargs) -> Self:
         """
-        注册一个时域波形图的绘制任务
+        信号时域波形图绘制函数
 
         Parameters
         ----------
-        Srs : Series or List[Series]
-            需要绘制的序列数据，支持单个 Series 对象或 Series 对象列表输入
-        **kwargs :
-            该子图特定的绘图参数（如 title, xlabel, ylim 等），会覆盖初始化时的全局设置
-
-        Returns
-        -------
-        LinePlot
-            返回绘图对象本身，以支持链式调用
-
-        Raises
-        ------
-        ValueError
-            输入数据不是 Series 对象或 Series 对象列表
+        Sig : Signal or List[Signal]
+            待绘制信号，支持单个 Signal 对象或 Signal 对象列表输入
         """
 
         # ------------------------------------------------------------------------------------#
-        # 时域波形绘制函数: 通过任务队列传递到绘图引擎
+        # 绘制函数: 通过任务队列传递
         def _draw_waveform(ax, data, kwargs):
-            SrsList = data.get("SrsList")
-            for Srs in SrsList:
+            SigList = data.get("SigList")
+            for Sig in SigList:
                 kwargs_plot = kwargs.get("plot", {})
                 ax.plot(
-                    Srs._axis(),
-                    Srs.data,
-                    label=Srs.label,
-                    **kwargs_plot.get(Srs.label, {}),
+                    Sig._axis(),
+                    Sig.data,
+                    label=Sig.label,
+                    **kwargs_plot.get(Sig.label, {}),
                 )
-            if len(SrsList) > 1:
+            if len(SigList) > 1:
                 ax.legend(loc="best")
 
         # ------------------------------------------------------------------------------------#
-        # 波形图绘制个性化设置
-        if not isinstance(Srs, list):
-            SrsList = [Srs]
+        # 绘制设置
+        if not isinstance(Sig, list):
+            SigList = [Sig]
         else:
-            SrsList = Srs
+            SigList = Sig
         # 绘图任务kwargs优先级: 用户传入kwargs > 全局kwargs > 方法默认设置
         task_kwargs = {
-            "xlabel": SrsList[0]._axis.label,
-            "xlim": SrsList[0]._axis.lim,
-            "ylabel": (f"{SrsList[0].name}" + f"[{SrsList[0].unit}]" if SrsList[0].unit else ""),
-            "title": f"{SrsList[0].label}波形图",
-        }
-        task_kwargs.update(self.kwargs)
-        task_kwargs.update(kwargs)
+            "xlabel": SigList[0]._axis.label,
+            "xlim": SigList[0]._axis.lim,
+            "ylabel": (f"{SigList[0].name}" + f"[{SigList[0].unit}]" if SigList[0].unit else ""),
+            "title": f"{SigList[0].label}波形图",
+        }  # 方法默认设置
+        task_kwargs.update(self.kwargs)  # 全局kwargs
+        task_kwargs.update(kwargs)  # 用户传入kwargs
         # ------------------------------------------------------------------------------------#
         # 注册绘图任务
         task = {
-            "data": {"SrsList": SrsList},
+            "data": {"SigList": SigList},
             "kwargs": task_kwargs,
             "function": _draw_waveform,
             "plugins": [],
@@ -138,27 +185,22 @@ class LinePlot(BasePlot):
         self.tasks.append(task)
         return self
 
-    def spectrum(self, Spc: Spectra, isFindPeaks: bool = False, isPosNeg: bool = False, **kwargs) -> "LinePlot":
+    def spectrum(self, Spc: Spectra, isFindPeaks: bool = False, isPosNeg: bool = False, **kwargs) -> Self:
         """
-        注册一个谱图的绘制任务
+        频谱绘制函数
 
         Parameters
         ----------
         Spc : Spectra
-            需要绘制的谱对象
+            待绘制频谱
         isFindPeaks: bool, default: False
-            是否需要在谱中标注峰值谱线
+            是否在谱中标注峰值谱线
         isPosNeg: bool, default: False
-            是否需要对谱线正负值进行不同颜色显示
-
-        Returns
-        -------
-        LinePlot
-            返回绘图对象本身，以支持链式调用
+            是否对谱线正负值进行不同颜色显示
         """
 
         # ------------------------------------------------------------------------------------#
-        # 谱图绘制函数: 通过任务队列传递到绘图引擎
+        # 绘制函数: 通过任务队列传递
         def _draw_spectrum(ax, data, kwargs):
             Spc = data["Spc"]
             kwargs_plot = kwargs.get("plot", {})
@@ -166,16 +208,16 @@ class LinePlot(BasePlot):
             ax.plot(f, d, **kwargs_plot.get(Spc.label, {}))
 
         # ------------------------------------------------------------------------------------#
-        # 频谱绘制个性化设置
+        # 绘制设置
         # 绘图任务kwargs优先级: 用户传入kwargs > 全局kwargs > 方法默认设置
         task_kwargs = {
             "xlabel": Spc.f_axis.label,
             "xlim": Spc.f_axis.lim,
             "ylabel": f"{Spc.name}" + f"[{Spc.unit}]" if Spc.unit else "",
             "title": f"{Spc.label}{Spc.name}谱",
-        }
-        task_kwargs.update(self.kwargs)
-        task_kwargs.update(kwargs)
+        }  # 方法默认设置
+        task_kwargs.update(self.kwargs)  # 全局kwargs
+        task_kwargs.update(kwargs)  # 用户传入kwargs
         task_plugins = []
         if isFindPeaks:
             task_plugins.append(
@@ -207,11 +249,11 @@ class LinePlot(BasePlot):
         trends: List[Series],
         errors: Optional[Series] = None,
         **kwargs,
-    ) -> "LinePlot":
-        """注册一个多趋势线条对比图的绘制任务"""
+    ) -> Self:
+        """趋势线条对比图绘制函数"""
 
         # ------------------------------------------------------------------------------------#
-        # 趋势线条绘制函数: 通过任务队列传递到绘图引擎
+        # 绘制函数: 通过任务队列传递
         def _draw_trendsCompare(ax, data, kwargs):
             conditions, trends, errors = (
                 data["conditions"],
@@ -235,16 +277,15 @@ class LinePlot(BasePlot):
             ax.legend(loc="best")
 
         # ------------------------------------------------------------------------------------#
-        # 趋势线条绘制个性化设置
-
+        # 绘制设置
         # 绘图任务kwargs优先级: 用户传入kwargs > 全局kwargs > 方法默认设置
         task_kwargs = {
             "xlabel": trends[0]._axis.label,
             "ylabel": (f"{trends[0].name}" + f"[{trends[0].unit}]" if trends[0].unit else ""),
             "title": trends[0].name + "趋势对比图",
-        }
-        task_kwargs.update(self.kwargs)
-        task_kwargs.update(kwargs)
+        }  # 方法默认设置
+        task_kwargs.update(self.kwargs)  # 全局kwargs
+        task_kwargs.update(kwargs)  # 用户传入kwargs
         # ------------------------------------------------------------------------------------#
         # 注册绘图任务
         task = {
@@ -257,10 +298,10 @@ class LinePlot(BasePlot):
         return self
 
     def orbit(self, Srs_X: Series, Srs_Y: Series, **kwargs) -> Self:
-        """注册一个平面轨迹图的绘制任务"""
+        """平面轨迹图绘制函数"""
 
         # ------------------------------------------------------------------------#
-        # 绘图函数
+        # 绘制函数: 通过任务队列传递
         def _draw_orbit(ax, data, kwargs):
             Srs_X, Srs_Y = data["Srs_X"], data["Srs_Y"]
             kwargs_plot = kwargs.get("plot", {})
@@ -276,19 +317,18 @@ class LinePlot(BasePlot):
             ax.grid(False)
 
         # ------------------------------------------------------------------------#
-        # 绘图个性化设置
+        # 绘制设置
         if Srs_X._axis != Srs_Y._axis:
             raise ValueError("用于绘制轨迹图的两个序列对象必须具有相同的坐标轴！")
-        # ------------------------------------------------------------------------#
         # 绘图任务kwargs优先级: 用户传入kwargs > 全局kwargs > 方法默认设置
         task_kwargs = {
             "figsize": (8, 6),
             "title": "平面轨迹图",
             "xlabel": f"{Srs_X.name}[{Srs_X.unit}]",
             "ylabel": f"{Srs_Y.name}[{Srs_Y.unit}]",
-        }
-        task_kwargs.update(self.kwargs)
-        task_kwargs.update(kwargs)
+        }  # 方法默认设置
+        task_kwargs.update(self.kwargs)  # 全局kwargs
+        task_kwargs.update(kwargs)  # 用户传入kwargs
         # ------------------------------------------------------------------------#
         # 注册绘图任务
         task = {
@@ -302,22 +342,22 @@ class LinePlot(BasePlot):
 
 
 # --------------------------------------------------------------------------------------------#
-# LinePlot类绘图方法函数形式调用接口
-def waveform_PlotFunc(Srs: Series, **kwargs) -> tuple:
+# 基于 LinePlot 类的高级绘图函数
+def PlotFunc_waveform(Srs: Series, **kwargs) -> tuple:
     """信号波形图绘制函数"""
     fig, ax = LinePlot().waveform(Srs, **kwargs).show(pattern="return")
     fig.show()
     return fig, ax
 
 
-def spectrum_PlotFunc(Spc: Spectra, **kwargs) -> tuple:
+def PlotFunc_spectrum(Spc: Spectra, **kwargs) -> tuple:
     """频谱绘制函数"""
     fig, ax = LinePlot().spectrum(Spc, **kwargs).show(pattern="return")
     fig.show()
     return fig, ax
 
 
-def decResult_PlotFunc(
+def PlotFunc_decResult(
     SigList_deco: List[Signal],
     reco: bool = False,
     **kwargs,
@@ -327,10 +367,10 @@ def decResult_PlotFunc(
     if reco:
         data = np.sum(SigList_deco, axis=0)
         Sig = SigList_deco[0].template(data).set_label("原始信号")
-        Spc = (np.abs(Sig.to_Spectra()) / len(Sig)).halfCut()
+        Spc = np.abs(Sig.to_Spectra().halfCut())
     else:
         Sig = SigList_deco[0]
-        Spc = (np.abs(Sig.to_Spectra()) / len(Sig)).halfCut()
+        Spc = np.abs(Sig.to_Spectra().halfCut())
         SigList_deco = SigList_deco[1:]
     # 准备绘图参数
     # 设置总图标题
@@ -339,24 +379,30 @@ def decResult_PlotFunc(
     xlim_waveform_allax = kwargs.pop("xlim_waveform", None)
     xlim_spectrum_allax = kwargs.pop("xlim_spectrum", None)
     # 设置ylim
-    ylim_waveform_allax = (
-        np.min(Sig) - 0.1 * np.ptp(Sig),
-        np.max(Sig) + 0.1 * np.ptp(Sig),
-    )  # 设置与原始信号相同的ylim
-    ampRange = np.max(Spc) - np.min(Spc)
-    ylim_spectrum_allax = (np.min(Spc) - 0.1 * ampRange, np.max(Spc) + 0.1 * ampRange)  # 设置频谱y轴范围为110%
+    if reco:
+        ylim_waveform_allax = (
+            np.min(Sig) - 0.1 * np.ptp(Sig),
+            np.max(Sig) + 0.1 * np.ptp(Sig),
+        )  # 设置与原始信号相同的ylim
+        ylim_spectrum_allax = (
+            np.min(Spc) - 0.1 * np.ptp(Spc),
+            np.max(Spc) + 0.1 * np.ptp(Spc),
+        )  # 设置频谱y轴范围为110%
+    else:
+        ylim_waveform_allax = kwargs.pop("ylim_waveform", None)
+        ylim_spectrum_allax = kwargs.pop("ylim_spectrum", None)
     # --------------------------------------------------------------------------------#
     # 绘制分解结果
     plot = LinePlot(title=title, ncols=2, **kwargs)
     # 绘制原始信号时域波形与频谱
-    plot.waveform(Sig, title=f"{Sig.label}时域波形", xlim=xlim_waveform_allax, ylim=(0, 10))
-    plot.spectrum(Spc, title=f"{Sig.label}幅值谱", xlim=xlim_spectrum_allax, ylim=ylim_spectrum_allax)
+    plot.waveform(Sig, xlim=xlim_waveform_allax, ylim=ylim_waveform_allax)
+    plot.spectrum(Spc, xlim=xlim_spectrum_allax, ylim=ylim_spectrum_allax)
     # 绘制各分解成分时域波形与频谱
     for Sig_deco in SigList_deco:
         # 绘制时域波形
         plot.waveform(Sig_deco, xlim=xlim_waveform_allax, ylim=ylim_waveform_allax)
         # 绘制频谱
-        Spc_deco = (np.abs(Sig_deco.to_Spectra()) / len(Sig_deco)).halfCut()
+        Spc_deco = np.abs(Sig_deco.to_Spectra().halfCut())
         plot.spectrum(Spc_deco, xlim=xlim_spectrum_allax, ylim=ylim_spectrum_allax)
     fig, ax = plot.show(pattern="return")
     fig.show()
