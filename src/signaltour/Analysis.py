@@ -24,10 +24,10 @@
 ### WaveletAnalysis:小波分析模块, 提供连续小波、离散小波等多种小波多分辨率分析方法
     - class:
         - `CWTAnalysis`: 连续小波变换 (Continuous Wavelet Transform, CWT) 分析类
+        - `DWTAnalysis`: 离散小波变换 (Discrete Wavelet Transform, DWT) 分析类
 ### ModeAnalysis: 非平稳多分量信号模态分解模块, 提供多种分解算法(如EMD, VMD)的实现与辅助函数
     - function:
         - `siftProcess_PlotFunc`: 绘制单次筛选过程的辅助图像
-        - `decResult_PlotFunc`: 绘制 EMD/VMD 分解结果的辅助图像
         - `updateProcess_PlotFunc`: 绘制 VMD 迭代更新过程的辅助图像
         - `search_localExtrema`: 搜索序列中的局部极大与极小值索引, 并基于阈值剔除弱极值点
         - `get_spectraCenter`: 计算频谱的功率加权中心频率

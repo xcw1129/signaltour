@@ -6,8 +6,9 @@
 ## 可用的接口
 
     - function:
-        - `waveform_PlotFunc`: 信号波形图绘制函数
-        - `spectrum_PlotFunc`: 频谱绘制函数
+        - `PlotFunc_waveform`: 信号波形图绘制函数
+        - `PlotFunc_spectrum`: 频谱绘制函数
+        - `PlotFunc_decResult`: 信号分解结果总览图绘制函数
     - class:
         - `LinePlot`: 波形图、谱图等一维线条图绘制绘图类
 """

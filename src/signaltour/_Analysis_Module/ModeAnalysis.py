@@ -7,7 +7,6 @@
 
     - function:
         - `siftProcess_PlotFunc`: 绘制单次筛选过程的辅助图像
-        - `decResult_PlotFunc`: 绘制 EMD/VMD 分解结果的辅助图像
         - `updateProcess_PlotFunc`: 绘制 VMD 迭代更新过程的辅助图像
         - `search_localExtrema`: 搜索序列中的局部极大与极小值索引, 并基于阈值剔除弱极值点
         - `get_spectraCenter`: 计算频谱的功率加权中心频率
