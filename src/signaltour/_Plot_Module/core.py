@@ -377,25 +377,21 @@ class BasePlot:
         if yscale == "log":
             cur_ylim = (max(cur_ylim[0], 1e-8), max(cur_ylim[1], 1e-8))
         true_ylim = task_kwargs.get("ylim", cur_ylim)
-        if "ylim" in task_kwargs:
-            # 如果用户指定了 ylim, 则直接使用, 不添加出血边
-            ylim = true_ylim
+        ymargin = task_kwargs.get("ymargin", 0.1)
+        if yscale == "log":
+            # 对数坐标下, 按对数比例设置出血边
+            log_min = np.log10(true_ylim[0])
+            log_max = np.log10(true_ylim[1])
+            log_range = log_max - log_min
+            ylim = (
+                10 ** (log_min - log_range * ymargin),
+                10 ** (log_max + log_range * ymargin),
+            )
         else:
-            ymargin = task_kwargs.get("ymargin", 0.1)
-            if yscale == "log":
-                # 对数坐标下, 按对数比例设置出血边
-                log_min = np.log10(true_ylim[0])
-                log_max = np.log10(true_ylim[1])
-                log_range = log_max - log_min
-                ylim = (
-                    10 ** (log_min - log_range * ymargin),
-                    10 ** (log_max + log_range * ymargin),
-                )
-            else:
-                ylim = (
-                    true_ylim[0] - (true_ylim[1] - true_ylim[0]) * ymargin,
-                    true_ylim[1] + (true_ylim[1] - true_ylim[0]) * ymargin,
-                )  # 人工设置y轴出血边
+            ylim = (
+                true_ylim[0] - (true_ylim[1] - true_ylim[0]) * ymargin,
+                true_ylim[1] + (true_ylim[1] - true_ylim[0]) * ymargin,
+            )  # 人工设置y轴出血边
         ax.set_ylim(ylim[0], ylim[1])
         # 设置Y轴刻度
         yticks = task_kwargs.get("yticks")
