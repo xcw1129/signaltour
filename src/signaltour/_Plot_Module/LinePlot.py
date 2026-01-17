@@ -319,13 +319,19 @@ def spectrum_PlotFunc(Spc: Spectra, **kwargs) -> tuple:
 
 def decResult_PlotFunc(
     SigList_deco: List[Signal],
+    reco: bool = False,
     **kwargs,
 ) -> tuple:
     """信号分解结果总览图绘制函数"""
     # 合成原始信号
-    data = np.sum(SigList_deco, axis=0)
-    Sig = SigList_deco[0].template(data).set_label("原始信号")
-    Spc = (np.abs(Sig.to_Spectra()) / len(Sig)).halfCut()
+    if reco:
+        data = np.sum(SigList_deco, axis=0)
+        Sig = SigList_deco[0].template(data).set_label("原始信号")
+        Spc = (np.abs(Sig.to_Spectra()) / len(Sig)).halfCut()
+    else:
+        Sig = SigList_deco[0]
+        Spc = (np.abs(Sig.to_Spectra()) / len(Sig)).halfCut()
+        SigList_deco = SigList_deco[1:]
     # 准备绘图参数
     # 设置总图标题
     title = kwargs.pop("title", "分解结果")
@@ -343,15 +349,15 @@ def decResult_PlotFunc(
     # 绘制分解结果
     plot = LinePlot(title=title, ncols=2, **kwargs)
     # 绘制原始信号时域波形与频谱
-    plot.waveform(Sig, title="原始信号时域波形", xlim=xlim_waveform_allax, ylim=ylim_waveform_allax)
-    plot.waveform(Spc, title="原始信号幅值谱", xlim=xlim_spectrum_allax, ylim=ylim_spectrum_allax)
+    plot.waveform(Sig, title=f"{Sig.label}时域波形", xlim=xlim_waveform_allax, ylim=(0, 10))
+    plot.spectrum(Spc, title=f"{Sig.label}幅值谱", xlim=xlim_spectrum_allax, ylim=ylim_spectrum_allax)
     # 绘制各分解成分时域波形与频谱
     for Sig_deco in SigList_deco:
         # 绘制时域波形
-        plot.waveform(Sig_deco, title=f"{Sig_deco.label}时域波形", xlim=xlim_waveform_allax, ylim=ylim_waveform_allax)
+        plot.waveform(Sig_deco, xlim=xlim_waveform_allax, ylim=ylim_waveform_allax)
         # 绘制频谱
         Spc_deco = (np.abs(Sig_deco.to_Spectra()) / len(Sig_deco)).halfCut()
-        plot.waveform(Spc_deco, title=f"{Sig_deco.label}幅值谱", xlim=xlim_spectrum_allax, ylim=ylim_spectrum_allax)
+        plot.spectrum(Spc_deco, xlim=xlim_spectrum_allax, ylim=ylim_spectrum_allax)
     fig, ax = plot.show(pattern="return")
     fig.show()
     return fig, ax
