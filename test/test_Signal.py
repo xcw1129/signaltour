@@ -20,9 +20,10 @@ __generated_with = "0.19.2"
 app = marimo.App()
 
 with app.setup(hide_code=True):
+    import warnings
+
     import marimo as mo
     import numpy as np
-    import warnings
 
     warnings.filterwarnings("ignore", category=UserWarning)
 

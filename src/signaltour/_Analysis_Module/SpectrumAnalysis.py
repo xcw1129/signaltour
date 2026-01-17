@@ -177,8 +177,6 @@ class SpectrumAnalysis(BaseAnalysis):
     ----------
     Sig : Signal
         待分析信号
-    isPacket : bool
-        是否对结果进行类型封装
     isPlot : bool
         是否绘制分析结果图
     plot_kwargs : dict
@@ -186,14 +184,37 @@ class SpectrumAnalysis(BaseAnalysis):
 
     Methods
     -------
-    - cycleconvolve : 计算两个序列数据的循环卷积
-    - convolve : 计算两个序列数据的线性卷积
-    - dft : 计算序列数据的离散傅里叶变换
-    - idft : 计算序列数据的逆离散傅里叶变换
-    - ft : 计算能量信号在0~N/2*Δf范围傅里叶变换的离散近似
-    - cft : 计算功率信号在0~N/2*Δf范围傅里叶级数系数的离散近似
-    - psd : 估计带噪声功率信号在0~N/2*Δf范围的功率谱分布
-    - enveSpectra : 计算信号的希尔伯特包络幅值谱
+    - dft(data: np.ndarray)
+            -> np.ndarray
+        计算序列数据的离散傅里叶变换
+
+    - idft(data: np.ndarray)
+            -> np.ndarray
+        计算序列数据的逆离散傅里叶变换
+
+    - convolve(x: np.ndarray, y: np.ndarray, mode: str = "full")
+            -> np.ndarray
+        计算两个序列数据的线性卷积
+
+    - ft(symmetric: bool = False)
+            -> Spectra
+        计算能量信号在0~N/2*Δf范围傅里叶变换的离散近似
+
+    - cft(winType: str = "汉宁窗", padTimes: int = 3)
+            -> Spectra
+        计算功率信号在0~N/2*Δf范围傅里叶级数系数的离散近似
+
+    - psd(averageTimes: int = 10, type: str = "功率")
+            -> Spectra
+        估计带噪声功率信号在0~N/2*Δf范围的功率分布
+
+    - enveSpectra()
+            -> Spectra
+        计算信号的希尔伯特包络幅值谱
+
+    - DiffSpectra(Sig_ref: Signal, averageTimes: int = 10, mode: str = "absolute")
+            -> Spectra
+        计算信号与输入参考信号的差分功率谱
     """
 
     # ----------------------------------------------------------------------------------------#

@@ -30,6 +30,15 @@ class STFTAnalysis(BaseAnalysis):
 
     用于分析非平稳频率变化信号的线性时频特性, 提供灵活的时频分辨率控制和多种窗函数选择
 
+    Attributes
+    ----------
+    Sig : Signal
+        待分析信号
+    isPlot : bool
+        是否绘制分析结果图
+    plot_kwargs : dict
+        自定义绘图参数
+
     Methods
     -------
     - get_segNum(df: Optional[float] = None, dt: Optional[float] = None)
@@ -40,7 +49,8 @@ class STFTAnalysis(BaseAnalysis):
             -> Tuple[np.ndarray, np.ndarray]
         将信号切片分段并加窗
 
-    - stft(df: Optional[float] = None, dt: Optional[float] = None, segNum: Optional[int] = None, winType: str = "汉宁窗")
+    - stft(df: Optional[float] = None, dt: Optional[float] = None,
+            segNum: Optional[int] = None, winType: str = "汉宁窗")
             -> tuple[np.ndarray, np.ndarray, np.ndarray]
         计算信号的短时傅里叶变换时频谱
     """
@@ -174,6 +184,15 @@ class WVDAnalysis(BaseAnalysis):
     魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类
 
     用于计算信号的时频能量概率分布, 具有高时频分辨率但存在交叉项
+
+    Attributes
+    ----------
+    Sig : Signal
+        待分析信号
+    isPlot : bool
+        是否绘制分析结果图
+    plot_kwargs : dict
+        自定义绘图参数
 
     Methods
     -------

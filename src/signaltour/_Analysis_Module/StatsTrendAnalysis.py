@@ -32,8 +32,6 @@ class StatsTrendAnalysis(BaseAnalysis):
         待分析信号
     isPlot : bool
         是否绘制分析结果图
-    isInputCheck : bool
-        是否进行输入值检查
     plot_kwargs : dict
         自定义绘图参数
 

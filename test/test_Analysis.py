@@ -16,14 +16,15 @@
 
 import marimo
 
-__generated_with = "0.19.2"
+__generated_with = "0.19.4"
 app = marimo.App()
 
 with app.setup(hide_code=True):
-    import marimo as mo
-    import numpy as np
-    import matplotlib.pyplot as plt
     import warnings
+
+    import marimo as mo
+    import matplotlib.pyplot as plt
+    import numpy as np
 
     warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -71,6 +72,41 @@ def _():
 
 
 @app.function
+def test_STFTAnalysis(Sig):
+    analyzer = Analysis.STFTAnalysis(Sig=Sig)
+    # 测试 stft 方法
+    time, freq, Sf = analyzer.stft(df=50, dt=0.1)
+    assert freq[0] == 0
+    assert freq[1] <= 50
+    assert time[1] - time[0] <= 0.1
+    assert Sf.shape == (len(time), len(freq))
+    analyzer.isPlot = True
+    analyzer.stft(df=40)
+    mo.output.append(plt.gcf())
+
+
+@app.function
+def test_WVDAnalysis(Sig):
+    analyzer = Analysis.WVDAnalysis(Sig=Sig)
+    # 测试 wvd 方法
+    time, freq, Wf = analyzer.wvd(dt=0.001)
+    assert len(freq) == len(Sig)
+    assert time[1] - time[0] <= 0.01
+    assert Wf.shape == (len(time), len(freq))
+    analyzer.isPlot = True
+    analyzer.wvd(dt=0.01)
+    mo.output.append(plt.gcf())
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ## 5. WaveletAnalysis模块
+    """)
+    return
+
+
+@app.function
 def test_CWTAnalysis(Sig):
     analyzer = Analysis.CWTAnalysis(Sig=Sig)
     # 测试 get_scale 方法
@@ -81,8 +117,8 @@ def test_CWTAnalysis(Sig):
     np.testing.assert_allclose(scale[:-1] / scale[1:], 3 ** (1 / 10))
     # 测试 get_wavelet 方法
     wavelettype = "B-Spline"
-    waveletparam = {"fc": 10, "fb": 4, "p": 3}
-    wavelets = analyzer.get_wavelet(
+    waveletparam = {"fc": 10, "fb": 5, "p": 3}
+    wavelets = analyzer.get_wavelets_discrete(
         type=wavelettype,
         param=waveletparam,
         scale=scale,
@@ -90,7 +126,7 @@ def test_CWTAnalysis(Sig):
         normalized="能量",
     )
     assert wavelets.shape == (50, 1000)
-    analyzer.get_wavelet(
+    analyzer.get_wavelets_discrete(
         type=wavelettype,
         param=waveletparam,
         isPlot=True,
@@ -106,6 +142,18 @@ def test_CWTAnalysis(Sig):
     analyzer.cwt(
         flow=20, nperoctave=50, wavelet=wavelettype, param=waveletparam
     )
+    mo.output.append(plt.gcf())
+
+
+@app.function
+def test_DWTnalysis(Sig):
+    analyzer = Analysis.DWTAnalysis(Sig=Sig, title=f"{Sig.label}DWT分解结果",ylim_spectrum=(0,50))
+    # 测试 dwt 方法
+    wavelet = "db2"
+    SigList = analyzer.dwt(wavelet=wavelet, level=4)
+    assert len(SigList) == 5  # 4 levels + 1 approximation
+    analyzer.isPlot = True
+    analyzer.dwt(wavelet=wavelet, level=5)
     mo.output.append(plt.gcf())
 
 

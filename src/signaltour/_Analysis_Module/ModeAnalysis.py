@@ -306,9 +306,11 @@ class EMDAnalysis(BaseAnalysis):
     Attributes
     ----------
     Sig : Signal
-        输入信号对象
+        待分析信号
     isPlot : bool
-        是否启用绘图流程联动
+        是否绘制分析结果图
+    plot_kwargs : dict
+        自定义绘图参数
     sifting_rounds : int
         单个 IMF 的最大筛选轮数
     sifting_itpMethod : str
@@ -322,11 +324,13 @@ class EMDAnalysis(BaseAnalysis):
 
     Methods
     -------
-    emd(decNum, weakness)
+    - emd(decNum, weakness)
         执行 EMD 分解, 返回模态列表(最后一项为残余)
-    extract_imf(Sig, rounds, times)
+
+    - extract_imf(Sig, rounds, times)
         从给定信号中提取一个 IMF 模态
-    sifting(Sig, interpolation)
+
+    - sifting(Sig, interpolation)
         执行一次筛选操作并返回包络、均值与新的临时 IMF
     """
 
@@ -552,9 +556,11 @@ class VMDAnalysis(BaseAnalysis):
     Attributes
     ----------
     Sig : Signal
-        输入信号对象
+        待分析信号
     isPlot : bool
-        是否启用绘图流程联动
+        是否绘制分析结果图
+    plot_kwargs : dict
+        自定义绘图参数
     initFc_method : str
         模态初始中心频率的初始化策略, 输入范围: ["uniform", "log", "octave", "linearrandom", "lograndom"]
     getTrend_method : str
@@ -562,11 +568,13 @@ class VMDAnalysis(BaseAnalysis):
 
     Methods
     -------
-    vmd(decNum, iterations, bw, tau, threshold, isExtend, getTrend)
+    - vmd(decNum, iterations, bw, tau, threshold, isExtend, getTrend)
         执行 VMD 分解并返回各模态的时域信号列表
-    init_modeFc(f_axis, K, method)
+
+    - init_modeFc(f_axis, K, method)
         生成 K 个初始中心频率
-    update_mode(Spc, Spc_mode_list, Spc_lambda, omega_list, alpha_list, Trend)
+
+    - update_mode(Spc, Spc_mode_list, Spc_lambda, omega_list, alpha_list, Trend)
         VMD 交替方向更新一次各模态与对应中心频率
     """
 
