@@ -20,13 +20,12 @@ __generated_with = "0.19.4"
 app = marimo.App()
 
 with app.setup(hide_code=True):
-    import warnings
+    import marimo as mo      
+    import numpy as np      
+    import matplotlib.pyplot as plt      
+    import warnings      
 
-    import marimo as mo
-    import matplotlib.pyplot as plt
-    import numpy as np
-
-    warnings.filterwarnings("ignore", category=UserWarning)
+    warnings.filterwarnings("ignore", category=UserWarning)      
 
     from signaltour import Analysis
 
@@ -72,29 +71,29 @@ def _():
 
 
 @app.function
-def test_STFTAnalysis(Sig):
-    analyzer = Analysis.STFTAnalysis(Sig=Sig)
+def test_STFTAnalysis(Sig):      
+    analyzer = Analysis.STFTAnalysis(Sig=Sig)      
     # 测试 stft 方法
-    time, freq, Sf = analyzer.stft(df=50, dt=0.1)
-    assert freq[0] == 0
-    assert freq[1] <= 50
-    assert time[1] - time[0] <= 0.1
-    assert Sf.shape == (len(time), len(freq))
-    analyzer.isPlot = True
-    analyzer.stft(df=40)
+    time, freq, Sf = analyzer.stft(df=50, dt=0.1)      
+    assert freq[0] == 0      
+    assert freq[1] <= 50      
+    assert time[1] - time[0] <= 0.1      
+    assert Sf.shape == (len(time), len(freq))      
+    analyzer.isPlot = True      
+    analyzer.stft(df=40)      
     mo.output.append(plt.gcf())
 
 
 @app.function
-def test_WVDAnalysis(Sig):
-    analyzer = Analysis.WVDAnalysis(Sig=Sig)
+def test_WVDAnalysis(Sig):      
+    analyzer = Analysis.WVDAnalysis(Sig=Sig)      
     # 测试 wvd 方法
-    time, freq, Wf = analyzer.wvd(dt=0.001)
-    assert len(freq) == len(Sig)
-    assert time[1] - time[0] <= 0.01
-    assert Wf.shape == (len(time), len(freq))
-    analyzer.isPlot = True
-    analyzer.wvd(dt=0.01)
+    time, freq, Wf = analyzer.wvd(dt=0.001)      
+    assert len(freq) == len(Sig)      
+    assert time[1] - time[0] <= 0.01      
+    assert Wf.shape == (len(time), len(freq))      
+    analyzer.isPlot = True      
+    analyzer.wvd(dt=0.01)      
     mo.output.append(plt.gcf())
 
 
@@ -107,53 +106,54 @@ def _():
 
 
 @app.function
-def test_CWTAnalysis(Sig):
-    analyzer = Analysis.CWTAnalysis(Sig=Sig)
-    # 测试 get_scale 方法
-    scale = analyzer.get_scale(b=3, j=5, v=10)
-    assert scale[0] == 1
-    assert all(scale[1:] < 1)
-    assert len(scale) == 50
-    np.testing.assert_allclose(scale[:-1] / scale[1:], 3 ** (1 / 10))
-    # 测试 get_wavelet 方法
-    wavelettype = "B-Spline"
-    waveletparam = {"fc": 10, "fb": 5, "p": 3}
-    wavelets = analyzer.get_wavelets_discrete(
-        type=wavelettype,
-        param=waveletparam,
-        scale=scale,
-        N=1000,
-        normalized="能量",
+def test_CWTAnalysis(Sig):      
+    analyzer = Analysis.CWTAnalysis(Sig=Sig)      
+    # 测试 get_scale 方法      
+    scale = analyzer.get_scale(b=3, j=5, v=10)      
+    assert scale[0] == 1      
+    assert all(scale[1:] < 1)      
+    assert len(scale) == 50      
+    np.testing.assert_allclose(scale[:-1] / scale[1:], 3 ** (1 / 10))      
+    # 测试 get_wavelet 方法      
+    wavelettype = "B-Spline"      
+    waveletparam = {"fc": 10, "fb": 5, "p": 3}      
+    wavelets = analyzer.get_wavelets_discrete(      
+        type=wavelettype,      
+        param=waveletparam,      
+        scale=scale,      
+        N=1000,      
+        normalized="能量",      
     )
-    assert wavelets.shape == (50, 1000)
-    analyzer.get_wavelets_discrete(
-        type=wavelettype,
-        param=waveletparam,
-        isPlot=True,
+    assert wavelets.shape == (50, 1000)      
+    analyzer.get_wavelets_discrete(      
+        type=wavelettype,      
+        param=waveletparam,      
+        isPlot=True,      
     )
-    mo.output.append(plt.gcf())
+    mo.output.append(plt.gcf())      
     # 测试 cwt 方法
-    time, freq, Wf = analyzer.cwt(flow=10, nperoctave=10)
-    assert freq[0] == 0
-    assert freq[-1] < Sig.t_axis.fs / 2
-    assert len(time) == len(Sig)
-    assert Wf.shape == (len(time), len(freq))
-    analyzer.isPlot = True
-    analyzer.cwt(
-        flow=20, nperoctave=50, wavelet=wavelettype, param=waveletparam
+    time, freq, Wf = analyzer.cwt(flow=10, nperoctave=10)      
+    assert freq[0] == 0      
+    assert freq[-1] < Sig.t_axis.fs / 2      
+    assert len(time) == len(Sig)      
+    assert Wf.shape == (len(time), len(freq))      
+    analyzer.isPlot = True      
+    analyzer.cwt(      
+        flow=20, nperoctave=50, wavelet=wavelettype, param=waveletparam      
     )
     mo.output.append(plt.gcf())
 
 
 @app.function
-def test_DWTnalysis(Sig):
-    analyzer = Analysis.DWTAnalysis(Sig=Sig, title=f"{Sig.label}DWT分解结果",ylim_spectrum=(0,50))
+def test_DWTnalysis(Sig):      
+    analyzer = Analysis.DWTAnalysis(Sig=Sig, title=f"{Sig.label}DWT分解结果",spectrum=False)      
     # 测试 dwt 方法
-    wavelet = "db2"
-    SigList = analyzer.dwt(wavelet=wavelet, level=4)
-    assert len(SigList) == 5  # 4 levels + 1 approximation
-    analyzer.isPlot = True
-    analyzer.dwt(wavelet=wavelet, level=5)
+    wavelet = "db4"  
+    SigList = analyzer.dwt(wavelet=wavelet, level=4)      
+    assert len(SigList) == 5  
+    assert sum([len(s) for s in SigList]) == len(Sig)
+    analyzer.isPlot = True   
+    analyzer.dwt(wavelet=wavelet, level=4)      
     mo.output.append(plt.gcf())
 
 
