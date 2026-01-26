@@ -339,14 +339,13 @@ class BasePlot:
     # 子图级图形元素设置方法
     def _setup_title(self, ax, task_kwargs):
         """设置标题"""
-        title = task_kwargs.get("title")
-        if title:
-            ax.set_title(title)
+        title = task_kwargs.get("title") or ""
+        ax.set_title(title)
 
     def _setup_x_axis(self, ax, task_kwargs):
         """设置X轴"""
         # 设置X轴标签
-        xlabel = task_kwargs.get("xlabel")
+        xlabel = task_kwargs.get("xlabel") or ""
         ax.set_xlabel(xlabel)
         # 检测用户是否指定为字符串刻度
         cur_xticklabels = ax.get_xticklabels()
@@ -382,7 +381,7 @@ class BasePlot:
     def _setup_y_axis(self, ax, task_kwargs):
         """设置Y轴"""
         # 设置Y轴标签
-        ylabel = task_kwargs.get("ylabel")
+        ylabel = task_kwargs.get("ylabel") or ""
         ax.set_ylabel(ylabel)
         # 设置Y轴刻度格式
         yscale = task_kwargs.get("yscale") or "linear"
@@ -393,7 +392,7 @@ class BasePlot:
         if yscale == "log":
             cur_ylim = (max(cur_ylim[0], 1e-8), max(cur_ylim[1], 1e-8))
         true_ylim = task_kwargs.get("ylim") or cur_ylim
-        ymargin = task_kwargs.get("ymargin") or 0.1
+        ymargin = task_kwargs.get("ymargin", 0.1)
         if yscale == "log":
             # 对数坐标下, 按对数比例设置出血边
             log_min = np.log10(true_ylim[0])
