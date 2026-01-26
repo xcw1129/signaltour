@@ -116,29 +116,35 @@ class ImagePlot(BasePlot):
         # 时频谱图绘制个性化设置
         matrix /= np.max(np.abs(matrix))  # 最大最小归一化, 方便调节色阶
         # 绘图任务kwargs优先级: 用户传入kwargs > 全局kwargs > 方法默认设置
+        task_kwargs_imshow = {
+            "cmap": ("viridis" if np.all(matrix >= 0) else "seismic"),  # 根据数据分布选择合适colormap
+            "aspect": "auto",
+            "interpolation": "bilinear" if continuous else "none",
+            "extent": [  # 默认坐标轴为线性均匀分布
+                time[0],
+                time[-1] + (time[1] - time[0]),
+                freq[0],
+                freq[-1] + (freq[1] - freq[0]),
+            ],
+            "origin": "lower",
+        }
+        task_kwargs_pcolormesh = {
+            "cmap": ("viridis" if np.all(matrix >= 0) else "seismic"),  # 根据数据分布选择合适colormap
+            "shading": "auto",
+        }
         task_kwargs = {
             "title": "时频图",
             "xlabel": "时间[s]",
             "ylabel": "频率[Hz]",
             "ymargin": 0,
-            "imshow": {
-                "cmap": ("viridis" if np.all(matrix >= 0) else "seismic"),  # 根据数据分布选择合适colormap
-                "aspect": "auto",
-                "interpolation": "bilinear" if continuous else "none",
-                "extent": [  # 默认坐标轴为线性均匀分布
-                    time[0],
-                    time[-1] + (time[1] - time[0]),
-                    freq[0],
-                    freq[-1] + (freq[1] - freq[0]),
-                ],
-                "origin": "lower",
-            },
-            "pcolormesh": {
-                "cmap": ("viridis" if np.all(matrix >= 0) else "seismic"),  # 根据数据分布选择合适colormap
-                "shading": "auto",
-            },
+            "imshow": task_kwargs_imshow,
+            "pcolormesh": task_kwargs_pcolormesh,
         }
+        task_kwargs_imshow.update(self.kwargs.pop("imshow", {}))
+        task_kwargs_pcolormesh.update(self.kwargs.pop("pcolormesh", {}))
         task_kwargs.update(self.kwargs)
+        task_kwargs_imshow.update(kwargs.pop("imshow", {}))
+        task_kwargs_pcolormesh.update(kwargs.pop("pcolormesh", {}))
         task_kwargs.update(kwargs)
         # ------------------------------------------------------------------------------------#
         # 注册绘图任务
