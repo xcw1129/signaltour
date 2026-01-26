@@ -93,7 +93,7 @@ class ImagePlot(BasePlot):
         # 时频谱图绘制函数: 通过任务队列传递到绘图引擎
         def _draw_spectrogram_imshow(ax, data, kwargs):
             Matrix = data.get("Matrix")
-            kwargs_imshow = kwargs.get("imshow") or {}
+            kwargs_imshow = kwargs.get("imshow", {})
             ax.imshow(
                 Matrix.T,  # 时间行转置为列, 符合时频图习惯
                 **kwargs_imshow,
@@ -102,7 +102,7 @@ class ImagePlot(BasePlot):
         def _draw_spectrogram_pcolormesh(ax, data, kwargs):
             Matrix = data.get("Matrix")
             axis1, axis2 = data.get("axis1"), data.get("axis2")
-            kwargs_pcolormesh = kwargs.get("pcolormesh") or {}
+            kwargs_pcolormesh = kwargs.get("pcolormesh", {})
             time, freq = np.meshgrid(axis1, axis2)
             ax.pcolormesh(
                 time,
@@ -114,13 +114,29 @@ class ImagePlot(BasePlot):
 
         # ------------------------------------------------------------------------------------#
         # 时频谱图绘制个性化设置
-
+        matrix /= np.max(np.abs(matrix))  # 最大最小归一化, 方便调节色阶
         # 绘图任务kwargs优先级: 用户传入kwargs > 全局kwargs > 方法默认设置
         task_kwargs = {
             "title": "时频图",
             "xlabel": "时间[s]",
             "ylabel": "频率[Hz]",
             "ymargin": 0,
+            "imshow": {
+                "cmap": ("viridis" if np.all(matrix >= 0) else "seismic"),  # 根据数据分布选择合适colormap
+                "aspect": "auto",
+                "interpolation": "bilinear" if continuous else "none",
+                "extent": [  # 默认坐标轴为线性均匀分布
+                    time[0],
+                    time[-1] + (time[1] - time[0]),
+                    freq[0],
+                    freq[-1] + (freq[1] - freq[0]),
+                ],
+                "origin": "lower",
+            },
+            "pcolormesh": {
+                "cmap": ("viridis" if np.all(matrix >= 0) else "seismic"),  # 根据数据分布选择合适colormap
+                "shading": "auto",
+            },
         }
         task_kwargs.update(self.kwargs)
         task_kwargs.update(kwargs)
@@ -131,26 +147,10 @@ class ImagePlot(BasePlot):
             # 均匀网格数据, 可用imshow绘制
             task_function = _draw_spectrogram_imshow
             task_data = {"Matrix": matrix}
-            task_kwargs["imshow"] = {
-                "cmap": ("viridis" if np.all(matrix >= 0) else "seismic"),  # 根据数据分布选择合适colormap
-                "aspect": "auto",
-                "interpolation": "bilinear" if continuous else "none",
-                "extent": [  # 默认坐标轴为线性均匀分布
-                    time[0],
-                    time[-1],
-                    freq[0],
-                    freq[-1],
-                ],
-                "origin": "lower",
-            }
         else:
             # 非均匀网格数据, 需用pcolormesh绘制
             task_function = _draw_spectrogram_pcolormesh
             task_data = {"Matrix": matrix, "axis1": time, "axis2": freq}
-            task_kwargs["pcolormesh"] = {
-                "cmap": ("viridis" if np.all(matrix >= 0) else "seismic"),  # 根据数据分布选择合适colormap
-                "shading": "auto",
-            }
         task = {
             "data": task_data,
             "kwargs": task_kwargs,
