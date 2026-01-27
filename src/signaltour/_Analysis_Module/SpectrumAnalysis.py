@@ -491,9 +491,6 @@ class SpectrumAnalysis(BaseAnalysis):
             - "relative": 相对变化率 (Spc2 - Spc1) / Spc1
             - "log": 对数差分 (dB), 10 * log10(Spc2 / Spc1)
         """
-        if self.Sig.t_axis != Sig_ref.t_axis:
-            raise ValueError("计算差分谱的两个信号的时间轴必须一致")
-
         # 计算两个信号的功率谱
         Spc1 = SpectrumAnalysis(self.Sig).psd(averageTimes=averageTimes).halfCut()
         Spc2 = SpectrumAnalysis(Sig_ref).psd(averageTimes=averageTimes).halfCut()
