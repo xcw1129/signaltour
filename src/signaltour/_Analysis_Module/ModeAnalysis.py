@@ -152,11 +152,12 @@ def updateProcess_PlotFunc(
     for Spc_mode in Spc_mode_list:
         Spc_mode.label = _make_label(Spc_mode.label, operation="getBase")
         plot.waveform(Spc_mode, title=f"{Spc_mode.label}幅值谱", ylim=ylim)
-    fig, ax = plot.show(pattern="return")
+    fig, axs = plot.show(pattern="return")
+    axs1d = axs.flatten()
     # 绘制中心频率线
     for i in range(len(Spc_mode_list)):
         fc = omega_list[i] / (2 * np.pi)
-        ax[i].axvline(
+        axs1d[i].axvline(
             fc,
             color="red",
             linestyle="--",
@@ -164,10 +165,10 @@ def updateProcess_PlotFunc(
             alpha=0.7,
             label=f"中心频率: {fc:.2f}Hz",
         )
-        ax[i].legend()
+        axs1d[i].legend()
     fig.suptitle(title, y=1.02)
     fig.show()
-    return fig, ax
+    return fig, axs
 
 
 # --------------------------------------------------------------------------------------------#
@@ -547,10 +548,9 @@ class EMDAnalysis(BaseAnalysis):
 
 
 # --------------------------------------------------------------------------------------------#
-# 变分模态分解
 class VMDAnalysis(BaseAnalysis):
     """
-    变分模态分解(VMD), 通过频域交替优化将信号分解为若干具有有限带宽的本征模态。
+    变分模态分解(VMD)类, 通过频域交替优化将信号分解为若干具有有限带宽的本征模态
 
     Attributes
     ----------
@@ -561,20 +561,12 @@ class VMDAnalysis(BaseAnalysis):
     plot_kwargs : dict
         自定义绘图参数
     initFc_method : str
-        模态初始中心频率的初始化策略, 输入范围: ["uniform", "log", "octave", "linearrandom", "lograndom"]
+        模态初始中心频率的初始化策略, 输入范围: "uniform", "log", "octave", "linearrandom", "lograndom"
     getTrend_method : str
-        趋势模态提取方法, 输入范围: ["滑动平均"]
+        趋势模态提取方法, 输入范围: "滑动平均"
 
     Methods
     -------
-    - vmd(decNum, iterations, bw, tau, threshold, isExtend, getTrend)
-        执行 VMD 分解并返回各模态的时域信号列表
-
-    - init_modeFc(f_axis, K, method)
-        生成 K 个初始中心频率
-
-    - update_mode(Spc, Spc_mode_list, Spc_lambda, omega_list, alpha_list, Trend)
-        VMD 交替方向更新一次各模态与对应中心频率
     """
 
     def __init__(
@@ -582,7 +574,11 @@ class VMDAnalysis(BaseAnalysis):
         Sig: Signal,
         isPlot: bool = False,
         initFc_method: str = "log",
+        getTrend: bool = False,
         getTrend_method: str = "滑动平均",
+        isExtend: bool = True,
+        tau: float = 0.5,
+        threshold: float = 1e-6,
         **kwargs,
     ):
         """
@@ -594,24 +590,28 @@ class VMDAnalysis(BaseAnalysis):
             输入信号对象
         isPlot : bool, 可选
             是否启用绘图流程联动, 默认: False
-        initFc_method : str, 可选
-            模态初始中心频率的初始化策略, 输入范围:
-            ["uniform", "log", "octave", "linearrandom", "lograndom"],
-            默认: "log"
-        getTrend_method : str, 可选
-            趋势模态提取方法, 输入范围: ["滑动平均"], 默认: "滑动平均"
-        **kwargs : dict, 可选
-            传递给绘图模块的其他关键字参数, 若未提供 `ylim`, 将根据输入信号自动设置合理范围。
-
-        Notes
-        -----
-        若未显式设置 `ylim`, 将依据输入信号峰峰值在上下各扩展 10% 作为默认显示范围。
+        initFc_method : str, 默认: "log"
+            模态初始中心频率的初始化策略, 输入范围: "uniform", "log", "octave", "linearrandom", "lograndom"
+        getTrend : bool, 默认: False
+            是否提取趋势模态
+        getTrend_method : str, 默认: "滑动平均"
+            趋势模态提取方法, 输入范围: "滑动平均"
+        isExtend : bool, 默认: True
+            是否对输入信号进行双边延拓以缓解边界效应
+        tau : float, 默认: 0.5
+            拉格朗日乘子更新步长
+        threshold : float, 默认: 1e-6
+            收敛判据阈值, 当相邻迭代模态变化的相对范数之和低于该值时终止
         """
         # Analysis类初始化
         super().__init__(Sig=Sig, isPlot=isPlot, **kwargs)
         # VMDAnalysis子类特有属性
         self.initFc_method = initFc_method
+        self.getTrend = getTrend
         self.getTrend_method = getTrend_method
+        self.isExtend = isExtend
+        self.tau = tau
+        self.threshold = threshold
 
     # ----------------------------------------------------------------------------------------#
     # 主接口
@@ -619,12 +619,8 @@ class VMDAnalysis(BaseAnalysis):
     def vmd(
         self,
         decNum: int,
-        iterations: int = 100,
         bw: float = 200.0,
-        tau: float = 0.5,
-        threshold: float = 1e-6,
-        isExtend: bool = True,
-        getTrend: bool = False,
+        iterations: int = 100,
     ) -> tuple:
         """
         执行 VMD 分解
@@ -632,35 +628,23 @@ class VMDAnalysis(BaseAnalysis):
         Parameters
         ----------
         decNum : int
-            期望分解出的模态数, 输入范围: >=1
-        iterations : int, 可选
-            最大迭代次数, 输入范围: >=1, 默认: 100
-        bw : float, 可选
-            限制模态的-3dB带宽(Hz), 用于计算惩罚因子, 输入范围: >=0, 默认: 200.0
-        tau : float, 可选
-            拉格朗日乘子更新步长, 输入范围: >=0, 默认: 0.5
-        threshold : float, 可选
-            收敛判据阈值, 当相邻迭代模态变化的相对范数之和低于该值时终止, 输入范围: >=0, 默认: 1e-6
-        isExtend : bool, 可选
-            是否进行镜像延拓以缓解边界效应, 默认: True
-        getTrend : bool, 可选
-            是否提取趋势模态并固定为首个模态, 默认: False
+            期望分解出的模态数
+        iterations : int, 默认: 100
+            最大迭代次数
+        bw : float, 默认: 200.0
+            限制模态的-3dB带宽(Hz), 用于计算惩罚因子
 
         Returns
         -------
-        Sig_mode_list : list[Signal]
-            分解得到的各模态时域信号, 长度为 `decNum`
-
-        Notes
-        -----
-        当 `getTrend=True` 时, 首个模态由趋势提取得到并在迭代中保持不变。
+        Sig_model_list : list[Signal]
+            分解得到的各模态时域信号
         """
         # ------------------------------------------------------------------------#
         # 数据双边延拓缓解边界效应
-        if isExtend:
+        if self.isExtend:
             Sig_extend = pad(Sig=self.Sig, length=len(self.Sig) // 2, method="mirror")
         else:
-            Sig_extend = self.Sig.copy()
+            Sig_extend = self.Sig
         # ------------------------------------------------------------------------#
         # 准备频域优化迭代输入
         analytic = signal.hilbert(Sig_extend)
@@ -696,7 +680,7 @@ class VMDAnalysis(BaseAnalysis):
         alpha = (10 ** (3 / 20) - 1) / (2 * (np.pi * bw) ** 2)
         alpha_list = alpha * np.ones(decNum)  # 初始各模态惩罚因子相等
         # 趋势模态提取
-        if getTrend:
+        if self.getTrend:
             Sig_trend = get_Trend(Sig_extend, method=self.getTrend_method)
             # 转为频谱形式并固定为第一个模态
             X_k_trend = fft.fft(Sig_trend) / len(Sig_trend)
@@ -722,28 +706,28 @@ class VMDAnalysis(BaseAnalysis):
                 Spc_lambda,
                 omega_list,
                 alpha_list,
-                Trend=getTrend,
+                Trend=self.getTrend,
             )
-            Spc_lambda += tau * (Spc_extend - (np.sum(new_Spc_mode_list, axis=0)))  # 更新拉格朗日乘子
+            Spc_lambda += self.tau * (Spc_extend - (np.sum(new_Spc_mode_list, axis=0)))  # 更新拉格朗日乘子
             # 检查优化收敛条件: 所有模态的变化量总和小于阈值
             if i % 10 == 0:  # 每10次迭代检查一次
                 diff = np.sum(
                     [np.linalg.norm(new - old) for new, old in zip(new_Spc_mode_list, Spc_mode_list)]
                 ) / np.sum([np.linalg.norm(mode) for mode in Spc_mode_list])
             Spc_mode_list = new_Spc_mode_list
-            if diff <= threshold:
+            if diff <= self.threshold:
                 # 优化有效收敛，更新模态标签，终止迭代
                 for Spc_mode in Spc_mode_list:
                     Spc_mode.label = _make_label(Spc_mode.label, operation="getBase")
                 break
         # ------------------------------------------------------------------------#
         # 频域优化复原为时域
-        Sig_mode_list = []
+        Sig_model_list = []
         for k in range(decNum):
             mode = np.real(fft.ifft(Spc_mode_list[k].data)) * len(Sig_extend)  # 反归一化
-            if isExtend:
+            if self.isExtend:
                 mode = mode[len(self.Sig) // 2 : -len(self.Sig) // 2]
-            Sig_mode_list.append(
+            Sig_model_list.append(
                 Signal(
                     self.Sig.t_axis.copy(),
                     mode,
@@ -752,7 +736,7 @@ class VMDAnalysis(BaseAnalysis):
                     label=_make_label(Spc_mode_list[k].label, operation="getBase"),
                 )
             )
-        return Sig_mode_list
+        return Sig_model_list
 
     # ----------------------------------------------------------------------------------------#
     # 辅助接口
@@ -796,7 +780,6 @@ class VMDAnalysis(BaseAnalysis):
             raise ValueError(f"{method}: 不支持的中心频率初始化方法")
         return fc_list
 
-    @BaseAnalysis._plot(updateProcess_PlotFunc)
     def update_mode(
         self,
         Spc: Spectra,

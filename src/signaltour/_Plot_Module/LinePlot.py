@@ -408,6 +408,6 @@ def PlotFunc_decResult(
         if spectrum:
             Spc_deco = np.abs(Sig_deco.to_Spectra().halfCut())
             plot.spectrum(Spc_deco, xlim=xlim_spectrum_allax, ylim=ylim_spectrum_allax)
-    fig, ax = plot.show(pattern="return")
+    fig, axs = plot.show(pattern="return")
     fig.show()
-    return fig, ax
+    return fig, axs

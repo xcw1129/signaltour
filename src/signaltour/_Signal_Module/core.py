@@ -268,9 +268,9 @@ class Series(NDArrayOperatorsMixin):
                 # 与源数据共享内存, 但不共享元数据比如shape等
                 self._data: np.ndarray = np.asarray(data, copy=False).view()
             else:
-                self._data: np.ndarray = np.array(data, copy=True, dtype=np.float64)
+                self._data: np.ndarray = np.array(data, copy=True)
         else:
-            self._data: np.ndarray = np.zeros(len(axis), dtype=np.float64)
+            self._data: np.ndarray = np.zeros(len(axis))
 
     OWNDATA: bool = False  # noqa: F821
 
@@ -813,6 +813,8 @@ class Spectra(Series):
         label : str, default: ""
             频谱标签
         """
+        if data is None:
+            data = np.zeros(len(axis), dtype=np.complex128)
         super().__init__(axis=axis, data=data, name=name, unit=unit, label=label)
 
     @property
