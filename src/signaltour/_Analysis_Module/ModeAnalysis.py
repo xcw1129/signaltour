@@ -205,9 +205,12 @@ def search_localExtrema(data: np.ndarray, neighbors: int = 5, threshold: float =
     min_index = signal.argrelextrema(data, np.less, order=num)[0]
     # 去除噪声极值点
     L = np.ptp(data)
-    diff = np.abs(data[max_index] - data[max_index - num])  # 极值点与邻域左边界点差值
+    idx_max_neighbor = np.maximum(0, max_index - num)
+    diff = np.abs(data[max_index] - data[idx_max_neighbor])  # 极值点与邻域左边界点差值
     max_index = max_index[diff > threshold * L]  # 筛选出差值大于阈值的极值点
-    diff = np.abs(data[min_index] - data[min_index - num])
+
+    idx_min_neighbor = np.maximum(0, min_index - num)
+    diff = np.abs(data[min_index] - data[idx_min_neighbor])
     min_index = min_index[diff > threshold * L]
     return max_index, min_index
 
@@ -681,7 +684,7 @@ class VMDAnalysis(BaseAnalysis):
         alpha_list = alpha * np.ones(decNum)  # 初始各模态惩罚因子相等
         # 趋势模态提取
         if self.getTrend:
-            Sig_trend = get_Trend(Sig_extend, method=self.getTrend_method)
+            Sig_trend = get_Trend(Sig_extend, type=self.getTrend_method)
             # 转为频谱形式并固定为第一个模态
             X_k_trend = fft.fft(Sig_trend) / len(Sig_trend)
             X_k_trend[1:] = X_k_trend[1:] * 2

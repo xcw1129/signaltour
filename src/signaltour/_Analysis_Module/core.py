@@ -13,7 +13,6 @@ __all__ = ["BaseAnalysis"]
 
 from .._Assist_Module.Dependencies import (
     Callable,
-    Tuple,
 )
 from .._Signal_Module.core import Signal
 
@@ -88,7 +87,7 @@ class BaseAnalysis:
                 if not self.isPlot:
                     return plot_args  # 不进行绘图, 直接返回结果
                 # 需确保被装饰函数返回值格式与PlotFunc输入参数格式一致
-                if isinstance(plot_args, Tuple):
+                if isinstance(plot_args, tuple):
                     PlotFunc(*plot_args, **self.plot_kwargs)
                 else:
                     PlotFunc(plot_args, **self.plot_kwargs)

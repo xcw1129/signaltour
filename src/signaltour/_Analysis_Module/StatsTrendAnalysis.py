@@ -59,8 +59,7 @@ class StatsTrendAnalysis(BaseAnalysis):
         "波形因子": lambda x: np.sqrt(np.mean(np.square(x))) / np.mean(np.abs(x)),
         "峰值因子": lambda x: np.max(np.abs(x)) / np.sqrt(np.mean(np.square(x))),
         "脉冲因子": lambda x: np.max(np.abs(x)) / np.mean(np.abs(x)),
-        "裕度因子": lambda x: np.max(np.abs(x))
-        / np.square(np.mean(np.sqrt(np.abs(x)))),
+        "裕度因子": lambda x: np.max(np.abs(x)) / np.square(np.mean(np.sqrt(np.abs(x)))),
     }
 
     def evaluate(self) -> dict:
@@ -72,13 +71,9 @@ class StatsTrendAnalysis(BaseAnalysis):
         dict
             包含各项统计指标名称和值的字典
         """
-        return {
-            name: func(self.Sig.data) for name, func in self._stats_func_dict.items()
-        }
+        return {name: func(self.Sig.data) for name, func in self._stats_func_dict.items()}
 
-    def distribution(
-        self, bins: int = 100, density: bool = True
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def distribution(self, bins: int = 100, density: bool = True) -> Tuple[np.ndarray, np.ndarray]:
         """
         计算信号的幅值概率分布(直方图)
 
@@ -97,9 +92,7 @@ class StatsTrendAnalysis(BaseAnalysis):
         return np.histogram(self.Sig.data, bins=bins, density=density)
 
     @BaseAnalysis._plot(PlotFunc_waveform)
-    def trend(
-        self, type: str, segNum: Optional[int] = None, tperseg: Optional[float] = None
-    ) -> Series:
+    def trend(self, type: str, segNum: Optional[int] = None, tperseg: Optional[float] = None) -> Series:
         """
         滑窗法计算信号指定统计值的时域趋势
 
@@ -125,11 +118,10 @@ class StatsTrendAnalysis(BaseAnalysis):
         # 计算所有分段统计值
         if type not in self._stats_func_dict:
             raise ValueError(f"type={type}: 不支持的统计值类型")
-        stat_values = np.apply_along_axis(
-            self._stats_func_dict[type], axis=1, arr=seg_data_list
-        )
+        stat_values = np.apply_along_axis(self._stats_func_dict[type], axis=1, arr=seg_data_list)
+        dt = seg_time[1] - seg_time[0] if len(seg_time) > 1 else self.Sig.t_axis.dt
         Srs_stats = Series(
-            t_Axis(len(stat_values), t0=seg_time[0], dt=seg_time[1] - seg_time[0]),
+            t_Axis(len(stat_values), t0=seg_time[0], dt=dt),
             stat_values,
             label=f"{self.Sig.label}滑动{type}",
         )  # 统计值量纲不确定, 不设置name和unit属性

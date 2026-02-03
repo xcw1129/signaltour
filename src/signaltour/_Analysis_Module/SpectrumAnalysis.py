@@ -89,14 +89,14 @@ def window(
     # 生成窗采样序列
     # 对称窗: t= n/(num-1), n=0,1/(num-1),2/(num-1),.., 1
     # 非对称窗: t=n/num=0,1/num,2/num,..(num//2)/num,..,(num-1)/num
-    if type not in window_name.keys():
-        raise ValueError(f"type={type}: 不支持的窗函数类型")
-    elif type == "自定义窗":
+    if type == "自定义窗":
         n = np.arange(num)  # n=0,1,2,3,...,N-1
         if symmetric:
             data = func(n / (num - 1))
         else:
             data = func(n / num)
+    elif type not in window_name.keys():
+        raise ValueError(f"type={type}: 不支持的窗函数类型")
     else:
         if type in ["高斯窗", "凯泽窗"] and winParam is not None:
             window = (window_name[type], winParam)
@@ -503,8 +503,8 @@ class SpectrumAnalysis(BaseAnalysis):
             Spc_diff.name = "功率变化率"
             Spc_diff.unit = "%"
         elif mode == "log":
-            # 计算 dB 差值: 20 * log10(P2/P1)
-            diff_data = 20 * np.log10(Spc2.data / (Spc1.data + 1e-12) + 1e-12)
+            # 计算 dB 差值: 10 * log10(P2/P1)
+            diff_data = 10 * np.log10(Spc2.data / (Spc1.data + 1e-12) + 1e-12)
             Spc_diff = Spc2.template(diff_data)
             Spc_diff.name = "对数差分功率"
             Spc_diff.unit = "dB"
