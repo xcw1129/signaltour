@@ -4,11 +4,11 @@
 name = "signaltour"
 version = "1.1.0"
 authors = [
-    {name = "Xiong Chengwen", email = "xiongcw1129@gmail.com"},
+    {name = "Xiong Chengwen/熊成文", email = "xiongcw1129@gmail.com"},
 ]
 license = {text = "Apache-2.0"}
 readme = "README.md"
-description = "Python package for the whole process of signal loading management, preprocessing, in-depth analysis and visualization of one-dimensional time series oscillation data"
+description = "Python package for the whole process of signal loading management, preprocessing, in-depth analysis and visualization of one-dimensional time series oscillation data/面向一维时间序列振荡数据, 实现信号加载管理、预处理、深度分析和可视化全过程的Python包"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.0.0",
