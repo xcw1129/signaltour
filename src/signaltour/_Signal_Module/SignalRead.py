@@ -206,7 +206,7 @@ class Files:
 
     def __iter__(self):
         """迭代器, 遍历数据文件路径"""
-        return iter(self._fileTable["filepath"])
+        return iter(self.filepaths)
 
     def _new_from_table(self, table: pd.DataFrame) -> Self:
         """从已有数据文件表创建新的Files实例并继承元数据"""
@@ -221,10 +221,11 @@ class Files:
 
     def __getitem__(self, item) -> Self:
         """支持整数/切片/字符串/字符串列表索引, 返回符合条件的 Files 子对象"""
-        # 整数与切片索引
+        # 1. 整数与切片索引
         if isinstance(item, (int, slice)):
-            idxs = [item] if isinstance(item, int) else item
-            return self._new_from_table(self._fileTable.iloc[idxs])
+            # 统一转为列表或切片直接索引
+            return self._new_from_table(self._fileTable.iloc[item] if isinstance(item, slice) else self._fileTable.iloc[[item]])
+
         # 字符串与字符串列表索引
         elif isinstance(item, (str, list)):
             target_names = [item] if isinstance(item, str) else item
@@ -301,6 +302,7 @@ class Files:
         isParallel: bool = False,
         parallelCores: Optional[int] = None,
         usePyarrow: bool = False,
+        **kwargs,
     ) -> filesData | None:
         """
         批量加载文件为DataFrame or 字典
@@ -317,11 +319,8 @@ class Files:
             并行读取时的线程数
         usePyarrow : bool, default: False
             是否启用 pyarrow 引擎加速文件读取(需安装 pyarrow 库)
-
-        Returns
-        -------
-        filesData | None
-            merge=True时为单个DataFrame, 否则为{"文件名": DataFrame}字典
+        **kwargs : dict
+            传递给底层读取函数(如 pd.read_csv)的额外参数
         """
         start_time = time()
         # 设置读取引擎
@@ -339,8 +338,9 @@ class Files:
         # ------------------------------------------------------------------------#
         # 批量读取文件
         df_list: List[pd.DataFrame] = Files._read_batch(
-            self.filepaths, Files._read_funcs[self.filetype], isParallel, parallelCores
+            self.filepaths, lambda fp: Files._read_funcs[self.filetype](fp, **kwargs), isParallel, parallelCores
         )
+
         # 结果检查与处理
         if len(df_list) == 0:
             logger.warning(f"Files加载终止: root={self.rootpath}, reason=未从文件中读取到有效数据")

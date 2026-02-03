@@ -67,7 +67,8 @@ def resample(
     if not Sig.t_axis.t0 <= t0 < (Sig.t_axis.T + Sig.t_axis.t0):
         raise ValueError("重采样起始点不在序列轴范围内")
     else:
-        start_idx = int((t0 - Sig.t_axis.t0) / Sig.t_axis.dt)
+        start_idx = int(round((t0 - Sig.t_axis.t0) / Sig.t_axis.dt))
+
     # 获取重采样数据片段 data2rs
     if T is None:
         data2rs = Sig.data[start_idx:]

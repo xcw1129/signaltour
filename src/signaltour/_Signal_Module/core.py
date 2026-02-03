@@ -129,7 +129,10 @@ class Axis:
                 raise IndexError(f"slice={key}: 物理坐标解析失败")
             val = float(match.group(1))
             # 转换为逻辑索引
-            return int(np.ceil((val - self._x0) / self._dx - 1e-9))  # 非整除索引右移, 确保切片在范围内
+            # 1e-9 为偏移量，确保刚好在边界的值（如 1.0s）转换为正确的 N-1 索引
+            idx = int(np.ceil((val - self._x0) / self._dx - 1e-9))
+            return max(0, min(self.N, idx))
+
         # int, None 等其他类型原样返回，由 numpy 处理逻辑索引
         return key
 
