@@ -14,6 +14,6 @@
 
 __version__ = "1.1.0"
 
-from . import Signal, Plot, Analysis  # noqa: I001
+from . import Signal, Analysis, Plot  # noqa: I001
 
-__all__ = ["Signal", "Plot", "Analysis"]
+__all__ = ["Signal", "Analysis", "Plot"]
