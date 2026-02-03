@@ -1,5 +1,5 @@
 """
-# Signal: 信号数据读取、生成、封装和预处理等数据管理模块
+# Signal: 信号数据读取、生成、封装和预处理等数据管理子包
 
 ---
 
@@ -36,6 +36,7 @@
         - `filtIIR`: 基于无限冲击响应滤波器对信号进行各种类型滤波
         - `filtMedian`: 基于中值滤波器对信号进行去噪处理
 """
+
 # ruff: noqa: F403
 # ruff: noqa: I001
 
@@ -46,6 +47,8 @@ from ._Signal_Module.SignalSample import *
 from ._Signal_Module.SignalFilt import *
 
 if __name__ == "__main__":
-    from script.autogenerate_module_doc import generate_aggregate_docstring
+    from script.docstring import update_package_docstring
 
-    generate_aggregate_docstring(__file__, summary="信号数据读取、生成、封装和预处理等数据管理模块")
+    update_package_docstring(
+        __file__, summary="信号数据读取、生成、封装和预处理等数据管理子包"
+    )

@@ -1,5 +1,5 @@
 """
-# Analysis: 统计趋势分析、谱分析、特征提取和分解等信号处理模块
+# Analysis: 统计分析、谱分析、非平稳时频分析等信号分析子包
 
 ---
 
@@ -10,7 +10,7 @@
         - `BaseAnalysis`: 通用信号分析处理方法类
 ### StatsTrendAnalysis: 时域统计分析模块, 提供时域统计趋势等方法
     - class:
-        - `StatsTrendAnalysis`: 信号时域统计分析方法
+        - `StatsTrendAnalysis`: 信号时域统计分析类
 ### SpectrumAnalysis: 平稳信号谱分析模块, 提供多种基于DFT的频谱分析方法
     - function:
         - `window`: 生成各类窗函数的整周期采样序列
@@ -34,8 +34,9 @@
         - `get_Trend`: 提取信号的趋势模态
     - class:
         - `EMDAnalysis`: 经验模态分解(EMD), 对输入的一维信号执行分解, 提供 IMF 提取、筛选过程可视化与结果绘制等功能。
-        - `VMDAnalysis`: 变分模态分解(VMD), 通过频域交替优化将信号分解为若干具有有限带宽的本征模态。
+        - `VMDAnalysis`: 变分模态分解(VMD)类, 通过频域交替优化将信号分解为若干具有有限带宽的本征模态
 """
+
 # ruff: noqa: F403
 # ruff: noqa: I001
 
@@ -47,6 +48,8 @@ from ._Analysis_Module.WaveletAnalysis import *
 from ._Analysis_Module.ModeAnalysis import *
 
 if __name__ == "__main__":
-    from script.autogenerate_module_doc import generate_aggregate_docstring
+    from script.docstring import update_package_docstring
 
-    generate_aggregate_docstring(__file__, summary="统计趋势分析、谱分析、特征提取和分解等信号处理模块")
+    update_package_docstring(
+        __file__, summary="统计分析、谱分析、非平稳时频分析等信号分析子包"
+    )

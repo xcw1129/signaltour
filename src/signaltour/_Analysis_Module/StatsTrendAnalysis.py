@@ -6,7 +6,7 @@
 ## 可用的接口
 
     - class:
-        - `StatsTrendAnalysis`: 信号时域统计分析方法
+        - `StatsTrendAnalysis`: 信号时域统计分析类
 """
 
 __all__ = ["StatsTrendAnalysis"]

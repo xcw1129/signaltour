@@ -4,7 +4,7 @@ import re
 
 
 def _extract_all_list(tree: ast.Module):
-    # 从AST中提取__all__列表
+    """从模块代码的AST中提取__all__列表"""
     all_names = []
     for node in tree.body:
         if isinstance(node, ast.Assign):
@@ -20,7 +20,7 @@ def _extract_all_list(tree: ast.Module):
 
 
 def _extract_interface_docstrings(tree: ast.Module, all_names: list):
-    # 从AST中提取__all__中指定接口的文档字符串首行
+    """从模块代码的AST中提取__all__中指定接口的文档字符串首行"""
     functions_docs = {}
     classes_docs = {}
 
@@ -39,14 +39,8 @@ def _extract_interface_docstrings(tree: ast.Module, all_names: list):
     return functions_docs, classes_docs
 
 
-def generate_module_docstring(fpath: str, title: str = "", summary: str = ""):
-    """
-    生成并更新指定Python文件的模块顶部文档字符串
-
-    该函数会读取目标文件，删除任何现有的模块级文档字符串，
-    然后根据文件的`__all__`列表和其中定义的公共接口的文档字符串，
-    生成一个新的模块级文档字符串，并将其写入文件顶部。
-    """
+def update_module_docstring(fpath: str, title: str = "", summary: str = ""):
+    """更新指定模块接口实现文件的文档字符串"""
     # 1. 删除现有的模块文档字符串
     fpath = os.path.abspath(fpath)
     if not os.path.exists(fpath):
@@ -118,6 +112,7 @@ def generate_module_docstring(fpath: str, title: str = "", summary: str = ""):
 
 
 def _resolve_imported_module_file(fpath: str, module_name: str, level: int):
+    """根据导入语句信息，解析并返回被导入模块的文件路径"""
     base_dir = os.path.dirname(fpath)
     if level == 0:
         if module_name.startswith("signaltour."):
@@ -135,6 +130,7 @@ def _resolve_imported_module_file(fpath: str, module_name: str, level: int):
 
 
 def _collect_imported_module_paths(tree: ast.Module, fpath: str):
+    """收集AST中所有自定义模块的导入路径"""
     module_files = []
     seen = set()
     for node in tree.body:
@@ -151,14 +147,8 @@ def _collect_imported_module_paths(tree: ast.Module, fpath: str):
     return module_files
 
 
-def generate_aggregate_docstring(fpath: str, summary: str):
-    """
-    生成并更新聚合接口文件（如顶层接口文件）的模块文档字符串。
-
-    该函数会读取目标文件，删除任何现有的模块级文档字符串，
-    然后自动收集所有通过import导入的子模块的接口文档，
-    并将聚合后的接口描述写入文件顶部。
-    """
+def update_package_docstring(fpath: str, summary: str):
+    """更新包接口导出文件的文档字符串"""
     # 1. 删除现有的模块文档字符串
     fpath = os.path.abspath(fpath)
     if not os.path.exists(fpath):
@@ -185,7 +175,7 @@ def generate_aggregate_docstring(fpath: str, summary: str):
     # 3. 聚合所有子模块的接口文档
     collected_sections = []
     for module_path in module_files:
-        doc_section = generate_module_docstring(module_path)
+        doc_section = update_module_docstring(module_path)
         if doc_section:
             collected_sections.append(doc_section)
 

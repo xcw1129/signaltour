@@ -1,5 +1,5 @@
 """
-# Plot: 波形图、一维/二维谱图和测试统计图等绘图可视化模块
+# Plot: 波形图、一维/二维谱图和测试统计图等绘图可视化子包
 
 ---
 
@@ -26,6 +26,7 @@
     - class:
         - `ImagePlot`: 时频谱图、热力图等二维图绘图类
 """
+
 # ruff: noqa: F403
 # ruff: noqa: I001
 
@@ -35,6 +36,8 @@ from ._Plot_Module.LinePlot import *
 from ._Plot_Module.ImagePlot import *
 
 if __name__ == "__main__":
-    from script.autogenerate_module_doc import generate_aggregate_docstring
+    from script.docstring import update_package_docstring
 
-    generate_aggregate_docstring(__file__, summary="波形图、一维/二维谱图和测试统计图等绘图可视化模块")
+    update_package_docstring(
+        __file__, summary="波形图、一维/二维谱图和测试统计图等绘图可视化子包"
+    )
