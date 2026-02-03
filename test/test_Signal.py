@@ -16,7 +16,7 @@
 
 import marimo
 
-__generated_with = "0.19.2"
+__generated_with = "0.19.4"
 app = marimo.App()
 
 with app.setup(hide_code=True):
@@ -321,6 +321,22 @@ def _():
     mo.md(r"""
     ### Signal.modulation()
     """)
+    return
+
+
+@app.cell
+def _():
+    def _AM(t):
+        return 50+200*t**2/900
+
+
+    def _FM(t):
+        return 1.5 * t/30
+
+
+    _Sig = Signal.modulation(fs=1024,T=30,fc=0.25,AM=_AM,FM=_FM)
+
+    _Sig.plot()
     return
 
 

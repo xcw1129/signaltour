@@ -16,7 +16,7 @@
 
 import marimo
 
-__generated_with = "0.19.4"
+__generated_with = "0.19.6"
 app = marimo.App()
 
 with app.setup(hide_code=True):
@@ -154,6 +154,21 @@ def test_DWTnalysis(Sig):
     assert sum([len(s) for s in SigList]) == len(Sig)
     analyzer.isPlot = True   
     analyzer.dwt(wavelet=wavelet, level=4)      
+    mo.output.append(plt.gcf())
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ## 6. ModeAnalysis模块
+    """)
+    return
+
+
+@app.function
+def test_VMDAnalysis(Sig):
+    analyzer= Analysis.VMDAnalysis(Sig=Sig,isPlot=True)
+    analyzer.vmd(decNum=3)
     mo.output.append(plt.gcf())
 
 
