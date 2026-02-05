@@ -16,8 +16,8 @@
 
 import marimo
 
-__generated_with = "0.19.4"
-app = marimo.App()
+__generated_with = "0.19.7"
+app = marimo.App(width="medium")
 
 with app.setup(hide_code=True):
     import warnings
@@ -51,11 +51,10 @@ def IS_Like_array(obj, array):
     # 测试数组行为
     assert len(obj) == len(array)
     np.testing.assert_allclose([x for x in obj], array)
-    np.testing.assert_allclose(
-        obj[array > array.mean()], array[array > array.mean()]
-    )
-    assert obj[-1] in obj
-    assert obj[-1] + 1e-3 not in obj
+    np.testing.assert_allclose(obj[array > array.mean()], array[array > array.mean()])
+    assert obj[0] in obj
+    assert obj[0] + 1e-8 not in obj
+    assert obj[0] + 1e-10 in obj  # 判断容差
     assert isinstance(obj[1:6:2], type(obj))  # 索引结果类型继承
     # 测试与numpy的兼容性
     np.testing.assert_allclose(np.asarray(obj), array)
@@ -127,29 +126,29 @@ def _():
 @app.function
 def test_Axis():
     # 创建实例
-    _axis = Signal.Axis(N=10, dx=1, x0=0, name="位移", unit="mm")
-    assert isinstance(_axis, Signal.Axis)
+    axis = Signal.Axis(N=10, dx=1, x0=0, name="位移", unit="mm")
+    assert isinstance(axis, Signal.Axis)
     # 测试属性
-    np.testing.assert_allclose(
-        _axis.data, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-    )
-    np.testing.assert_allclose(
-        _axis(), np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-    )
-    _axis._dx, _axis._x0, _axis.N = 2, -2, 3
-    np.testing.assert_allclose(_axis.data, np.array([-2, 0, 2]))
-    _axis._dx, _axis._x0, _axis.N = 1, 0, 10
-    assert _axis.lim == (0, 10) and _axis.L == 10
-    assert isinstance(_axis.label, str)
+    np.testing.assert_allclose(axis.data, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
+    np.testing.assert_allclose(axis(), np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
+    axis._dx, axis._x0, axis.N = 2, -2, 3
+    np.testing.assert_allclose(axis.data, np.array([-2, 0, 2]))
+    axis._dx, axis._x0, axis.N = 1, 0, 10
+    assert axis.lim == (0, 10) and axis.L == 10
+    assert isinstance(axis.label, str) and "位移" in axis.label and "mm" in axis.label
     # 测试相等判断
-    assert _axis == Signal.Axis(N=10, dx=1, x0=0, unit="mm")
-    assert _axis != Signal.Axis(N=10, dx=1, x0=0, unit="cm")
-    assert _axis != Signal.Axis(N=10, dx=2, x0=0, unit="mm")
-    assert _axis != _axis.data
+    assert axis == Signal.Axis(N=10, dx=1, x0=0, unit="mm")
+    assert axis != Signal.Axis(N=10, dx=1, x0=0, unit="cm")
+    assert axis != Signal.Axis(N=10, dx=2, x0=0, unit="mm")
+    assert axis != axis.data
+    # 测试物理坐标索引
+    assert axis["2mm"] == 2
+    assert axis["1.5mm":"6.5mm":2] == axis[2:7:2]
     # 测试array行为
-    IS_Like_array(_axis, _axis.data)
-    # 测试拷贝操作
-    assert _axis.copy() == _axis and _axis.copy() is not _axis
+    IS_Like_array(axis, axis.data)
+    # 测试方法
+    # 测试.copy()
+    assert axis.copy() == axis and axis.copy() is not axis
 
 
 @app.cell(hide_code=True)
@@ -163,52 +162,46 @@ def _():
 @app.function
 def test_Series():
     # 创建实例
-    _data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-    _axis = Signal.Axis(N=5, dx=0.1, x0=0, name="时间", unit="s")
-    Signal.Series.OWNDATA = False
-    _series = Signal.Series(
-        data=_data, axis=_axis, name="压力", unit="Pa", label="锅炉压力"
+    data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    axis = Signal.Axis(N=5, dx=0.1, x0=0, name="时间", unit="s")
+    Signal.Series._COPY_DATA_WHEN_INIT = False
+    series = Signal.Series(
+        data=data, axis=axis, name="压力", unit="Pa", label="锅炉压力"
     )
-    assert isinstance(_series, Signal.Series)
+    assert isinstance(series, Signal.Series)
     # 测试属性
-    np.testing.assert_allclose(_series.data, _data)
-    assert _series.axis == _axis and _series.axis is not _axis
+    np.testing.assert_allclose(series.data, data)
+    assert series.axis == axis and series.axis is not axis
     assert (
-        isinstance(_series.name, str)
-        and isinstance(_series.unit, str)
-        and isinstance(_series.label, str)
+        isinstance(series.name, str)
+        and isinstance(series.unit, str)
+        and isinstance(series.label, str)
     )
     # 测试对data的维护方式
-    assert np.shares_memory(_series.data, _data) == True
-    assert _series.data is not _data
-    assert _series.data.flags["WRITEABLE"] == False
-    Signal.Series.OWNDATA = True
-    _series.data = _data
-    assert np.shares_memory(_series.data, _data) == False
-    Signal.Series.OWNDATA = False
+    assert np.shares_memory(series.data, data) == True
+    assert series.data is not data
+    assert series.data.flags["WRITEABLE"] == False
+    Signal.Series._COPY_DATA_WHEN_INIT = True
+    series.data = data
+    assert np.shares_memory(series.data, data) == False
+    Signal.Series._COPY_DATA_WHEN_INIT = False
     # 测试相等判断
-    assert _series == Signal.Series(
-        data=_data, axis=_axis, name="压力", unit="Pa"
-    )
-    assert _series != Signal.Series(
-        data=_data, axis=_axis, name="压力", unit="MPa"
-    )
-    assert _series != Signal.Series(
-        data=_data + 1, axis=_axis, name="压力", unit="MPa"
-    )
+    assert series == Signal.Series(data=data, axis=axis, name="压力", unit="Pa")
+    assert series != Signal.Series(data=data, axis=axis, name="压力", unit="MPa")
+    assert series != Signal.Series(data=data + 1, axis=axis, name="压力", unit="MPa")
     # 测试物理坐标索引
-    assert _series["0.1s"] == 2.0
-    assert _series["0.15s":"0.5s"] == _series[2:5]
+    assert series["0.1s"] == 2.0
+    assert series["0.15s":"0.5s"] == series[2:5]
     # 测试array行为
-    IS_Like_array(_series, _data)
+    IS_Like_array(series, data)
     # 测试算术运算兼容
-    IS_Support_operator(_series, _data)
+    IS_Support_operator(series, data)
     # 测试拷贝操作
-    _copy = _series.copy()
-    assert _copy == _series and _copy is not _series
+    _copy = series.copy()
+    assert _copy == series and _copy is not series
     # 测试链式调用
-    _series_new = _series.template(_data).set_label("水箱压力")
-    assert _series_new == _series and _series_new.label == "水箱压力"
+    _series_new = series.template(data).set_label("水箱压力")
+    assert _series_new == series and _series_new.label == "水箱压力"
 
 
 @app.cell(hide_code=True)
@@ -224,7 +217,7 @@ def test_Signal():
     # 创建实例
     _data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
     _axis = Signal.t_Axis(len(_data), fs=10)
-    Signal.Signal.OWNDATA = False
+    Signal.Signal._COPY_DATA_WHEN_INIT = False
     _sig = Signal.Signal(
         data=_data, axis=_axis, name="振动", unit="m/s^2", label="测点1信号"
     )
@@ -241,18 +234,14 @@ def test_Signal():
     assert np.shares_memory(_sig.data, _data) == True
     assert _sig.data is not _data
     assert _sig.data.flags["WRITEABLE"] == False
-    Signal.Signal.OWNDATA = True
+    Signal.Signal._COPY_DATA_WHEN_INIT = True
     _sig.data = _data
     assert np.shares_memory(_sig.data, _data) == False
-    Signal.Signal.OWNDATA = False
+    Signal.Signal._COPY_DATA_WHEN_INIT = False
     # 测试相等判断
-    assert _sig == Signal.Signal(
-        data=_data, axis=_axis, name="振动", unit="m/s^2"
-    )
+    assert _sig == Signal.Signal(data=_data, axis=_axis, name="振动", unit="m/s^2")
     assert _sig != Signal.Signal(data=_data, axis=_axis, name="振动", unit="g")
-    assert _sig != Signal.Signal(
-        data=_data + 1, axis=_axis, name="振动", unit="g"
-    )
+    assert _sig != Signal.Signal(data=_data + 1, axis=_axis, name="振动", unit="g")
     # 测试物理坐标索引
     assert _sig["0.1s"] == 2.0
     assert _sig["0.15s":"0.5s"] == _sig[2:5]
@@ -327,14 +316,12 @@ def _():
 @app.cell
 def _():
     def _AM(t):
-        return 50+200*t**2/900
-
+        return 50 + 200 * t**2 / 900
 
     def _FM(t):
-        return 1.5 * t/30
+        return 1.5 * t / 30
 
-
-    _Sig = Signal.modulation(fs=1024,T=30,fc=0.25,AM=_AM,FM=_FM)
+    _Sig = Signal.modulation(fs=1024, T=30, fc=0.25, AM=_AM, FM=_FM)
 
     _Sig.plot()
     return
