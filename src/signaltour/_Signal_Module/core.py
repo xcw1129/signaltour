@@ -7,11 +7,11 @@
 
     - class:
         - `Axis`: 通用坐标轴类, 用于生成和管理一维顺序均匀采样坐标轴数据
-        - `Series`: 通用一维序列数据类, 用于保存和处理坐标轴和对应序列数据
+        - `Series`: 通用一维序列数据类, 用于保存和管理坐标轴和对应序列数据
         - `t_Axis`: 时间坐标轴类
         - `f_Axis`: 频率坐标轴类
-        - `Signal`: 一维时域信号类, 带有时间采样信息
-        - `Spectra`: 一维频谱类, 带有频率采样信息
+        - `Signal`: 一维时域信号类, 实现采样信息与数据的绑定, 支持混合运算并内置常用信号数据交互方法
+        - `Spectra`: 一维频谱数据类, 实现采样信息与数据的绑定, 支持混合运算并内置常用频谱数据交互方法
 """
 
 __all__ = ["Axis", "Series", "t_Axis", "f_Axis", "Signal", "Spectra"]
@@ -207,7 +207,7 @@ class Axis:
     # 外部用户方法
     def copy(self) -> Self:
         """返回拷贝副本"""
-        return deepcopy(self)
+        return deepcopy(self)  # 确保嵌套可变属性独立
 
 
 # --------------------------------------------------------------------------------------------#
@@ -233,13 +233,13 @@ class Series(NDArrayOperatorsMixin):
     Methods
     -------
     set_label(label: str) -> Self
-        修改序列数据标签并返回自身, 便于链式调用
+        修改序列标签并返回自身
     copy() -> Self
-        返回自身深拷贝
+        返回拷贝副本
     plot(**kwargs) -> Tuple
-        绘制序列数据的波形图
+        绘制序列的波形图
     template(data: Optional[np.ndarray] = None) -> Self
-        使用自身采样参数生成新实例
+        继承元信息生成新实例, 方便快速创建同类对象
     """
 
     def __init__(
@@ -256,9 +256,9 @@ class Series(NDArrayOperatorsMixin):
         Parameters
         ----------
         axis : Axis
-            坐标轴
+            序列坐标轴
         data : np.ndarray, optional
-            一维序列数组，长度需与axis一致
+            序列数据数组
         name : str, optional
             序列名称
         unit : str, optional
@@ -271,17 +271,7 @@ class Series(NDArrayOperatorsMixin):
         self.name: str = name
         self.unit: str = unit
         self.label: str = label
-        # 初始化数据
-        if data is not None:
-            if self._check_data(data) is False:
-                raise ValueError(f"data={data}: 输入序列数组非法")
-            if self._COPY_DATA_WHEN_INIT:
-                self._data: np.ndarray = np.array(data, copy=True)
-            else:
-                # 与源数据共享内存, 但不共享元数据比如shape等
-                self._data: np.ndarray = np.asarray(data, copy=False).view()
-        else:
-            self._data: np.ndarray = np.zeros(len(axis))
+        self.data = data if data is not None else np.zeros(len(axis))
 
     _COPY_DATA_WHEN_INIT: bool = False  # noqa: F821
 
@@ -295,18 +285,18 @@ class Series(NDArrayOperatorsMixin):
     @axis.setter
     def axis(self, value: Axis):
         """序列坐标轴"""
-        self._axis: Axis = value  # 支持整体替换
+        self._axis = value  # 支持整体替换
 
     @property
     def data(self) -> np.ndarray:
         """序列数据数组"""
-        arr: np.ndarray = self._data.view()  # 返回源数据视图, 避免内存拷贝消耗
+        arr = self._data.view()  # 返回源数据视图, 避免内存拷贝消耗
         arr.flags.writeable = False  # 防止用户意外修改._data属性
         return arr
 
     @data.setter
     def data(self, value: np.ndarray):
-        # 支持用户整体替换数据, 但输入数据需合法
+        # 支持整体替换数据, 但需合法
         if self._check_data(value) is False:
             raise ValueError(f"data={value}: 输入序列数据数组非法")
         if self._COPY_DATA_WHEN_INIT:
@@ -318,6 +308,8 @@ class Series(NDArrayOperatorsMixin):
     # 数据检查和转换
     def _check_data(self, data):
         arr = np.asarray(data)
+        if arr.flags.writeable is False:
+            raise ValueError("输入序列数据数组不可写, 无法作为数据源")
         if arr.ndim != 1 or len(arr) != len(self._axis):
             return False
         if np.any(np.isnan(arr)):
@@ -360,7 +352,7 @@ class Series(NDArrayOperatorsMixin):
             # 返回同类实例
             new_Srs = self.template()
             new_Srs._axis = new_axis
-            new_Srs._data = self._data[real_idx]  # 与array的切片视图机制一致
+            new_Srs.data = self._data[real_idx]
             return new_Srs
         else:
             # 其它情况直接返回array
@@ -392,6 +384,7 @@ class Series(NDArrayOperatorsMixin):
 
     # 底层运算函数兼容
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        # ------------------------------------------------------------------------#
         # 支持out参数：将out中的Series实例替换为其_data属性便于in-place修改
         out = kwargs.get("out", None)
         if out is not None:
@@ -403,19 +396,20 @@ class Series(NDArrayOperatorsMixin):
                     new_out.append(o)
             kwargs = dict(kwargs)
             kwargs["out"] = tuple(new_out)
+        # ------------------------------------------------------------------------#
         # 将输入中的Series实例转为array以便ufunc处理
         args = [x._data if isinstance(x, Series) else x for x in inputs]
-        # ------------------------------------------------------------------------#
         # 根据method调用相应的ufunc方法
-        # 处理就地操作（如add.at等，不支持）
-        if method == "at":
+        if method == "at":  # 处理就地操作（如add.at等，不支持）
             return NotImplemented
-        # 处理非逐元素操作（如add.reduce等，极少使用）
-        if method == "reduce" or method == "reduceat" or method == "outer":
+        if (
+            method == "reduce" or method == "reduceat" or method == "outer"
+        ):  # 处理非逐元素操作（如add.reduce等，极少使用）
             res = getattr(ufunc, method)(*args, **kwargs)
             return res
-        # 处理逐元素运算（如abs、multiply等，常用）
-        elif method == "__call__" or method == "accumulate":
+        elif (
+            method == "__call__" or method == "accumulate"
+        ):  # 处理逐元素运算（如abs、multiply等，常用）
             res = getattr(ufunc, method)(*args, **kwargs)
             # 如果指定了out参数, 则直接返回out
             if out is not None:
@@ -440,29 +434,23 @@ class Series(NDArrayOperatorsMixin):
     # --------------------------------------------------------------------------------#
     # 外部用户方法
     def set_label(self, label: str) -> Self:
-        """修改序列数据标签并返回自身"""
+        """修改序列标签并返回自身"""
         self.label = label
         return self
 
     def copy(self) -> Self:
-        """
-        返回自身深拷贝
-
-        See Also
-        --------
-        `numpy.ndarray.copy` : 返回数组的副本
-        """
-        return deepcopy(self)
+        """返回拷贝副本"""
+        return deepcopy(self)  # 确保嵌套可变属性独立
 
     def plot(self, **kwargs) -> Tuple:
-        """绘制序列数据的波形图"""
+        """绘制序列的波形图"""
         from .._Plot_Module.LinePlot import PlotFunc_waveform
 
-        fig, ax = PlotFunc_waveform(self, **kwargs)
-        return fig, ax
+        fig, axs = PlotFunc_waveform(self, **kwargs)
+        return fig, axs
 
     def template(self, data: Optional[np.ndarray] = None) -> Self:
-        """保留自身采样参数等元数据生成新实例, 方便快速创建同类对象"""
+        """继承元信息生成新实例, 方便快速创建同类对象"""
         new_Srs = type(self)(
             axis=self._axis,
             data=data,
@@ -480,27 +468,27 @@ class t_Axis(Axis):
 
     Attributes
     ----------
+    N : int
+        采样点数
     fs : float
-        采样频率
+        采样频率[Hz]
     dt : float
-        采样间隔
+        采样间隔[s]
     t0 : float
-        起始时间
+        采样起始时间[s]
     T : float
-        采样时长
+        采样时长[s]
     data : np.ndarray
-        时间坐标轴数据数组
-    unit : str
-        坐标轴数据单位, 固定为 "s"
+        采样时刻数组[s]
     label : str
-        坐标轴标签, 固定为 "时间[s]"
+        坐标轴标签, 固定值: "时间[s]"
     lim : tuple
-        时间坐标轴数据范围 (min, max)
+        采样时间范围[s]: (min, max)
 
     Methods
     -------
     copy() -> Self
-        返回自身深拷贝
+        返回拷贝副本
     """
 
     def __init__(
@@ -517,13 +505,13 @@ class t_Axis(Axis):
         Parameters
         ----------
         fs : float, optional
-            采样频率
+            采样频率[Hz]
         dt : float, optional
-            采样间隔
+            采样间隔[s]
         T : float, optional
-            采样时长
+            采样时长[s]
         t0 : float, default: 0.0
-            起始时间
+            采样起始时间[s]
         """
         # 输入参数检查
         if (not [N, fs, dt, T].count(None) == 2) or (fs is not None and dt is not None):
@@ -544,51 +532,50 @@ class t_Axis(Axis):
         super().__init__(N=N, dx=1.0 / fs, x0=t0, unit="s", name="时间")
 
     # --------------------------------------------------------------------------------#
-    # 动态属性
-    # Axis类核心参数映射到t_Axis公开动态属性，支持读写
+    # 动态可读属性
+    # Axis类核心参数映射到子类自定义属性，支持读写
     @property
     def fs(self) -> float:
-        """采样频率 (Hz), 修改同步至 dt"""
+        """采样频率[Hz], 修改同步至 dt"""
         return 1.0 / self._dx
 
     @fs.setter
     def fs(self, value: float):
         if value <= 0:
-            raise ValueError("fs 必须大于 0")
+            raise ValueError(f"fs={value}: 采样频率必须大于0")
         self._dx = 1.0 / float(value)
 
     @property
     def dt(self) -> float:
-        """采样间隔 (s), 修改同步至 fs"""
+        """采样间隔[s], 修改同步至 fs"""
         return self._dx
 
     @dt.setter
     def dt(self, value: float):
         if value <= 0:
-            raise ValueError("dt 必须大于 0")
+            raise ValueError(f"dt={value}: 采样间隔必须大于0")
         self._dx = float(value)
 
     @property
     def t0(self) -> float:
-        """起始时间 (s)"""
+        """采样起始时间[s]"""
         return self._x0
 
     @t0.setter
     def t0(self, value: float):
-        # t0 可为负数或零，无需严格检查
         self._x0 = float(value)
 
     @property
     def T(self) -> float:
-        """采样时长 (s), 修改同步至 N"""
+        """采样时长[s], 修改同步至 N"""
         return self.N * self.dt
 
     @T.setter
     def T(self, value: float):
         if value <= 0:
-            raise ValueError("T 必须大于 0")
+            raise ValueError(f"T={value}: 采样时长必须大于0")
         # 固定 dt，调整 N
-        self.N = max(1, int(value / self.dt))
+        self.N = max(1, int(np.ceil(value / self.dt - 1e-9)))
 
 
 class f_Axis(Axis):
@@ -598,28 +585,24 @@ class f_Axis(Axis):
     Attributes
     ----------
     N : int
-        频率采样点数
+        采样点数
     df : float
-        频率分辨率
+        频率分辨率[Hz]
     f0 : float
-        频率起始点
+        频率起始点[Hz]
     F : float
-        频率分布宽度
-    T : float
-        等效时间窗长度
+        频率分布宽度[Hz]
     data : np.ndarray
-        频率坐标轴数据数组
-    unit : str
-        坐标轴数据单位, 固定为 "Hz"
+        频率轴数组[Hz]
     label : str
-        坐标轴标签, 固定为 "频率[Hz]"
+        坐标轴标签, 固定值: "频率[Hz]"
     lim : tuple
-        频率坐标轴数据范围 (min, max)
+        频率分布范围[Hz]: (min, max)
 
     Methods
     -------
     copy() -> Self
-        返回自身深拷贝
+        返回拷贝副本
     """
 
     def __init__(self, N: int, df: float, f0: float = 0.0):
@@ -629,67 +612,54 @@ class f_Axis(Axis):
         Parameters
         ----------
         N : int
-            频率采样点数
+            采样点数
         df : float
-            频率分辨率
+            频率分辨率[Hz]
         f0 : float, default: 0.0
-            频率起始点
+            频率起始点[Hz]
         """
         super().__init__(dx=df, N=N, x0=f0, unit="Hz", name="频率")
 
     # --------------------------------------------------------------------------------#
-    # 动态属性
-    # Axis类核心参数映射到f_Axis公开动态属性，支持读写
+    # 动态可读属性
+    # Axis类核心参数映射到子类自定义属性，支持读写
     @property
     def df(self) -> float:
-        """频率分辨率 (Hz)"""
+        """频率分辨率[Hz]"""
         return self._dx
 
     @df.setter
     def df(self, value: float):
         if value <= 0:
-            raise ValueError("df 必须大于 0")
+            raise ValueError(f"df={value}: 频率分辨率必须大于0")
         self._dx = float(value)
 
     @property
     def f0(self) -> float:
-        """频率起始点 (Hz)"""
+        """频率起始点[Hz]"""
         return self._x0
 
     @f0.setter
     def f0(self, value: float):
-        # f0 可为负数或零，无需严格检查
         self._x0 = float(value)
 
     @property
     def F(self) -> float:
-        """频率分布宽度 (Hz), 修改同步至 N"""
+        """频率分布宽度[Hz], 修改同步至 N"""
         return self.N * self._dx  # 频率分布宽度
 
     @F.setter
     def F(self, value: float):
         if value <= 0:
-            raise ValueError("F 必须大于 0")
+            raise ValueError(f"F={value}: 频率分布宽度必须大于0")
         # 固定 df，调整 N
-        self.N = max(1, int(value / self._dx))
-
-    @property
-    def T(self) -> float:
-        """等效时间窗长度 (s), 修改同步至 df"""
-        return 1.0 / self._dx
-
-    @T.setter
-    def T(self, value: float):
-        if value <= 0:
-            raise ValueError("T 必须大于 0")
-        # 固定 N，调整 df
-        self._dx = 1.0 / float(value)
+        self.N = max(1, int(np.ceil(value / self._dx - 1e-9)))
 
 
 # --------------------------------------------------------------------------------------------#
 class Signal(Series):
     """
-    一维时域信号类, 带有时间采样信息
+    一维时域信号类, 实现采样信息与数据的绑定, 支持混合运算并内置常用信号数据交互方法
 
     Attributes
     ----------
@@ -707,15 +677,15 @@ class Signal(Series):
     Methods
     -------
     set_label(label: str) -> Self
-        修改信号标签并返回自身, 便于链式调用
+        修改序列标签并返回自身
     copy() -> Self
-        返回自身深拷贝
-    plot(**kwargs)
-        绘制时域波形
+        返回拷贝副本
+    plot(**kwargs) -> Tuple
+        绘制序列的波形图
     template(data: Optional[np.ndarray] = None) -> Self
-        使用自身采样参数生成新实例
+        继承元信息生成新实例, 方便快速创建同类对象
     to_Spectra() -> Spectra
-        生成信号的频谱
+        转换信号到其频谱
     """
 
     def __init__(
@@ -727,14 +697,14 @@ class Signal(Series):
         label: str = "",
     ):
         """
-        初始化Signal对象
+        一维时域信号数据类, 实现采样信息与数据的绑定, 支持混合运算并内置常用信号数据交互方法
 
         Parameters
         ----------
         axis : t_Axis
             时间坐标轴
         data : np.ndarray, optional
-            信号数据数组, 长度需与axis一致
+            信号数据数组
         name : str, default: ""
             信号数据名称
         unit : str, default: ""
@@ -744,9 +714,8 @@ class Signal(Series):
         """
         super().__init__(axis=axis, data=data, name=name, unit=unit, label=label)
 
-    # _axis为Axis子类实例.
-    # 内部通过_axis直接访问, 简化维护逻辑.
-    # 外部通过t_axis/f_axis属性访问, 以支持子类坐标轴特性.
+    # --------------------------------------------------------------------------------#
+    # 动态可读属性
     @property
     def t_axis(self) -> t_Axis:
         """时间坐标轴"""
@@ -754,6 +723,7 @@ class Signal(Series):
 
     @t_axis.setter
     def t_axis(self, value: t_Axis):
+        """时间坐标轴"""
         self._axis: t_Axis = value
 
     @property
@@ -762,28 +732,20 @@ class Signal(Series):
         return f_Axis(df=1 / self.t_axis.T, N=self.t_axis.N)
 
     # --------------------------------------------------------------------------------#
-    # 自带方法
-    def plot(self, **kwargs) -> Tuple:
-        """绘制信号的时域波形图"""
-        from .._Plot_Module.LinePlot import PlotFunc_waveform
-
-        fig, ax = PlotFunc_waveform(self, **kwargs)
-        return fig, ax
-
-    def to_Spectra(self, density: bool = False) -> "Spectra":
-        """生成信号的频谱"""
+    # 外部用户方法
+    def to_Spectra(self) -> "Spectra":
+        """转换信号到其频谱"""
         from .._Analysis_Module.SpectrumAnalysis import SpectrumAnalysis
 
-        if density:
-            Spc = SpectrumAnalysis(self).ft()
-        else:
-            Spc = SpectrumAnalysis(self).cft(padTimes=0)  # 保持原始长度, 不延拓
+        Spc = SpectrumAnalysis(self).cft(
+            winType="矩形窗", padTimes=0
+        )  # 保持原始长度, 不延拓
         return Spc
 
 
 class Spectra(Series):
     """
-    一维频谱类, 带有频率采样信息
+    一维频谱数据类, 实现采样信息与数据的绑定, 支持混合运算并内置常用频谱数据交互方法
 
     Attributes
     ----------
@@ -801,15 +763,15 @@ class Spectra(Series):
     Methods
     -------
     set_label(label: str) -> Self
-        修改频谱标签并返回自身, 便于链式调用
+        修改序列标签并返回自身
     copy() -> Self
-        返回自身深拷贝
-    plot(**kwargs)
-        绘制频谱曲线
+        返回拷贝副本
+    plot(**kwargs) -> Tuple
+        绘制序列的波形图
     template(data: Optional[np.ndarray] = None) -> Self
-        使用自身采样参数生成新实例
-    halfCut() -> Spectra
-        返回单边谱
+        继承元信息生成新实例, 方便快速创建同类对象
+    halfCut() -> Self
+        裁剪为单边谱
     """
 
     def __init__(
@@ -821,19 +783,19 @@ class Spectra(Series):
         label: str = "",
     ):
         """
-        一维频谱类, 带有频率采样信息
+        一维频谱数据类, 实现采样信息与数据的绑定, 支持混合运算并内置常用信号数据交互方法
 
         Parameters
         ----------
-        axis : f_Axis
+        f_axis : f_Axis
             频率坐标轴
-        data : np.ndarray, optional
-            频谱数据数组，长度需与axis一致
-        name : str, default: ""
+        data : np.ndarray
+            频谱数据数组
+        name : str
             频谱数据名称
-        unit : str, default: ""
+        unit : str
             频谱数据单位
-        label : str, default: ""
+        label : str
             频谱标签
         """
         if data is None:
@@ -847,28 +809,22 @@ class Spectra(Series):
 
     @f_axis.setter
     def f_axis(self, value: f_Axis):
+        """频率坐标轴"""
         self._axis: f_Axis = value
 
     # --------------------------------------------------------------------------------#
-    # 自带方法
-    def plot(self, **kwargs) -> Tuple:
-        """绘制频谱"""
-        from .._Plot_Module.LinePlot import PlotFunc_spectrum
-
-        fig, ax = PlotFunc_spectrum(self, **kwargs)
-        return fig, ax
-
-    def halfCut(self) -> "Spectra":
-        """裁剪为余弦形式单边谱"""
+    # 外部用户方法
+    def halfCut(self) -> Self:
+        """裁剪为单边谱"""
         if self.f_axis.f0 != 0.0:
-            raise TypeError(
-                f"f0={self.f_axis.f0}: 当前谱频率轴不完整, 无法进行单边谱截取"
+            raise ValueError(
+                f"f0={self.f_axis.f0}: 当前谱频率轴不完整, 无法进行单边谱裁剪"
             )
         N = len(self)
         if N % 2 == 0:  # 偶数点，非对称
             half_N = N // 2
         else:  # 奇数点，对称
-            half_N = (N + 1) // 2
+            half_N = (N + 1) // 2  # 包含fn频率点, 但幅值一般为0
 
         self._axis, self._data = (
             self._axis[:half_N],

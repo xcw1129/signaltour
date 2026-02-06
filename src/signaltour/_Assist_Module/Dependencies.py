@@ -6,7 +6,17 @@ import re  # 正则表达式
 import os  # 操作系统交互
 import logging  # 日志记录打印
 from pathlib import Path  # 文件路径封装
-from typing import Dict, List, Tuple, Set, Callable, Optional, Self, Literal, Any  # 类型注解
+from typing import (
+    Dict,
+    List,
+    Tuple,
+    Set,
+    Callable,
+    Optional,
+    Self,
+    Literal,
+    Any,
+)  # 类型注解
 from typing import Annotated, TypeAlias, TypeGuard  # 类型检查增强
 from typing import get_origin, get_args  # 类型注解工具
 from collections import deque  # 双端队列数据
@@ -22,6 +32,17 @@ import random  # 随机操作
 
 # 向量数值计算库
 import numpy as np
+from numpy import (
+    uint8,
+    uint16,
+    int8,
+    int16,
+    int32,
+    float32,
+    float64,
+    complex64,
+    complex128,
+)  # 常用数据类型别名
 from numpy.lib.mixins import NDArrayOperatorsMixin  # ndarray运算符重载基类
 
 # 高级数学分析库
