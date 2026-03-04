@@ -1,14 +1,14 @@
 """
-# SignalSampling
+# SignalSample
 
 ---
 
 ## 可用的接口
 
     - function:
-        - `resample`: 对信号序列 Sig 进行任意时间段的重采样，支持下采样与上采样多种方式。
-        - `pad`: 对信号对象进行边界延拓处理，支持镜像延拓和零填充方式
-        - `slice`: 对信号进行滑窗跳步分段，首尾段自动延拓
+        - `resample`: 对信号序列 Sig 进行任意时间段的重采样, 支持下采样与上采样多种方式。
+        - `pad`: 对信号对象进行边界延拓处理, 支持镜像延拓和零填充方式
+        - `slice`: 对信号进行滑窗跳步分段, 首尾段自动延拓
 """
 
 __all__ = ["resample", "pad", "slice"]
@@ -29,55 +29,47 @@ def resample(
     T: Optional[float] = None,
 ) -> Signal:
     """
-    对信号序列 Sig 进行任意时间段的重采样，支持下采样与上采样多种方式。
+    截取信号任意时间段并重采样, 支持下采样与上采样
 
     Parameters
     ----------
     Sig : Signal
-        输入信号对象。
+        待重采样信号
     type : str, 默认: 'spacing'
-        重采样方法，支持：
+        重采样方法, 支持:
         - 'spacing'：等间隔直接抽取（时域抽取）
         - 'fft'：频域重采样（支持上采样与下采样）
         - 'extreme'：极值法（仅下采样）
-    dt : float, 可选
-        重采样后的采样间隔，若为 None 则与原信号一致。
-    t0 : float, 可选
-        重采样起始点，若为 None 则与原信号起点一致。
-    T : float, 可选
-        重采样区间长度，若为 None 则采样至信号末尾。
+    dt : float, optional
+        重采样间隔, 若为 None 则与原信号一致
+    t0 : float, optional
+        重采样起始点, 若为 None 则与原信号起点一致
+    T : float, optional
+        重采样区间长度, 若为 None 则采样至信号末尾
 
     Returns
     -------
     Signal
-        重采样后的信号对象。
-
-    Raises
-    ------
-    ValueError
-        - 重采样起始点或长度超出原信号范围
-        - 极值法采样点数计算错误
-        - 不支持的重采样方法
+        重采样后信号
     """
     if dt is None:
         dt = Sig.t_axis.dt
     if t0 is None:
         t0 = Sig.t_axis.t0
     # 获取重采样起始点的索引
-    if not Sig.t_axis.t0 <= t0 < (Sig.t_axis.T + Sig.t_axis.t0):
-        raise ValueError("重采样起始点不在序列轴范围内")
+    if not Sig.t_axis.lim[0] <= t0 < Sig.t_axis.lim[1]:
+        raise ValueError(f"t0={t0}: 重采样起始点超出信号时间轴范围")
     else:
         start_idx = int(round((t0 - Sig.t_axis.t0) / Sig.t_axis.dt))
-
-    # 获取重采样数据片段 data2rs
+    # 截取重采样数据片段
     if T is None:
-        data2rs = Sig.data[start_idx:]
-    elif T + t0 > Sig.t_axis.T + Sig.t_axis.t0:
-        raise ValueError("重采样长度超出序列轴范围")
+        data2rs = Sig._data[start_idx:].copy()
+    elif T + t0 > Sig.t_axis.lim[1]:
+        raise ValueError(f"T={T}: 重采样长度超出信号时间轴范围")
     else:
-        N2rs = int(np.ceil(T / (Sig.t_axis.dt)))  # N = L / dx，向上取整
-        data2rs = Sig.data[start_idx : start_idx + N2rs]
-    # 获取重采样点数
+        N2rs = int(np.ceil(T / (Sig.t_axis.dt)))  # N = L / dx, 向上取整
+        data2rs = Sig._data[start_idx : start_idx + N2rs].copy()
+    # 计算重采样后信号点数
     N_in = len(data2rs)
     ratio2rs = Sig.t_axis.dt / dt
     N_out = int(N_in * ratio2rs)  # N_out = N_in * (dx_in / dx_out)
@@ -101,30 +93,24 @@ def resample(
                 seg = data2rs[idxs[i] : idxs[i + 1]]
                 new_data.append(np.min(seg))
                 new_data.append(np.max(seg))
-            # 保证采样点数为 N_out
-            if N_out == len(new_data):
-                pass
-            elif N_out - len(new_data) == 1:
-                new_data.append(data2rs[-1])
-            else:
-                raise ValueError("极值法采样点数计算错误")
             data2rs = np.array(new_data)
         elif type == "spacing":
             # 等间隔直接抽取
             idxs = np.linspace(0, N_in, N_out, dtype=int, endpoint=False)
             data2rs = data2rs[idxs]
         else:
-            raise ValueError("下采样方法仅支持'fft', 'extreme', 'spacing'")
+            raise ValueError(f"type={type}: 不支持的重采样方法")
     elif ratio2rs > 1:  # 上采样
-        if type != "fft":
-            raise ValueError("仅支持fft方法进行上采样")
-        # 频域上采样：傅里叶变换后补零扩展
-        F_x = np.fft.fft(data2rs)
-        F_x_pad = np.zeros(N_out, dtype=complex)
-        F_x_pad[: N_in // 2] = F_x[: N_in // 2]
-        F_x_pad[-N_in // 2 :] = F_x[-N_in // 2 :]
-        data2rs = np.fft.ifft(F_x_pad).real
-        data2rs *= ratio2rs  # 幅值修正
+        if type == "fft":
+            # 频域上采样：傅里叶变换后补零扩展
+            F_x = np.fft.fft(data2rs)
+            F_x_pad = np.zeros(N_out, dtype=complex)
+            F_x_pad[: N_in // 2] = F_x[: N_in // 2]
+            F_x_pad[-N_in // 2 :] = F_x[-N_in // 2 :]
+            data2rs = np.fft.ifft(F_x_pad).real
+            data2rs *= ratio2rs  # 幅值修正
+        else:
+            raise ValueError(f"t0={t0}, type={type}: 当前采样方法不支持上采样")
     else:
         pass  # 采样频率相同, 不进行重采样
 
@@ -139,16 +125,16 @@ def resample(
 
 def pad(Sig: Signal, length: int, method: str = "mirror") -> Signal:
     """
-    对信号对象进行边界延拓处理，支持镜像延拓和零填充方式
+    对信号对象进行边界延拓处理, 支持镜像延拓和零填充方式
 
     Parameters
     ----------
     Sig : Signal
         输入信号对象
     length : int
-        延拓长度，输入范围: >=1
+        延拓长度, 输入范围: >=1
     method : str, default: "mirror"
-        延拓方式，支持:
+        延拓方式, 支持:
         - "mirror": 镜像延拓（反射填充）
         - "zero": 零填充
 
@@ -191,28 +177,28 @@ def slice(
     projection: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    对信号进行滑窗跳步分段，首尾段自动延拓
+    对信号进行滑窗跳步分段, 首尾段自动延拓
 
     Parameters
     ----------
     Sig : Signal
         输入信号对象
     segNum : int, optional
-        分段数，优先级高于 tperseg
+        分段数, 优先级高于 tperseg
     tperseg : float, optional
-        每段时长[s]，若未指定 segNum 时生效
+        每段时长[s], 若未指定 segNum 时生效
     overlap : float, default: 0.5
-        相邻分段的重叠比例，输入范围: [0, 1)
+        相邻分段的重叠比例, 输入范围: [0, 1)
         推荐不大于0.5, 以避免分段间相关性过高
     pad_mode : str, default: "constant"
-        边界填充方式，参考 numpy.pad 的 mode 参数
+        边界填充方式, 参考 numpy.pad 的 mode 参数
     projection : bool, default: False
-        是否使用内存映射分段机制，可节省内存开销但数据为只读
+        是否使用内存映射分段机制, 可节省内存开销但数据为只读
 
     Returns
     -------
     seg_data_list : np.ndarray
-        分段后的信号数据，shape=(segNum, nperseg)
+        分段后的信号数据, shape=(segNum, nperseg)
     seg_time : np.ndarray
         分段中心时间轴
 
@@ -231,7 +217,7 @@ def slice(
     # 计算分段关键参数: nhop, nperseg
     # N-nhop<(segNum-1)*nhop+1<=N
     # ⇒(N-1)/segNum<nhop<=(N-1)/(segNum-1)
-    if segNum is not None:  # 同时指定segNum和tperseg时，以segNum为准
+    if segNum is not None:  # 同时指定segNum和tperseg时, 以segNum为准
         nhop = int((len(Sig) - 1) / (segNum - 1))  # 向下取整
         nperseg = int(nhop / (1 - overlap))
     elif tperseg is not None:
