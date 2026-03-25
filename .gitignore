@@ -1,9 +1,12 @@
 .pytest_cache/
+*.py[cod]
+*$py.class
 .vscode/
 .ruff_cache/
 .venv/
 dist/
 build/
+doc/_build/
 signaltour.egg-info/
 __pycache__/
 uv.lock
