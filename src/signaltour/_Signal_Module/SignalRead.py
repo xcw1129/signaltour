@@ -39,7 +39,7 @@ from .._Assist_Module.Dependencies import (
 
 # 初始化日志记录器
 logger = logging.getLogger(__name__)
-filesData: TypeAlias = pd.DataFrame | Dict[str, pd.DataFrame]
+Filesdata: TypeAlias = pd.DataFrame | Dict[str, pd.DataFrame]
 
 
 def set_logging_level(level: int | str) -> None:
@@ -224,7 +224,9 @@ class Files:
         # 1. 整数与切片索引
         if isinstance(item, (int, slice)):
             # 统一转为列表或切片直接索引
-            return self._new_from_table(self._fileTable.iloc[item] if isinstance(item, slice) else self._fileTable.iloc[[item]])
+            return self._new_from_table(
+                self._fileTable.iloc[item] if isinstance(item, slice) else self._fileTable.iloc[[item]]
+            )
 
         # 字符串与字符串列表索引
         elif isinstance(item, (str, list)):
@@ -300,27 +302,25 @@ class Files:
         merge: bool = True,
         mode: str = "hstack",
         isParallel: bool = False,
-        parallelCores: Optional[int] = None,
+        parallelNum: Optional[int] = None,
         usePyarrow: bool = False,
         **kwargs,
-    ) -> filesData | None:
+    ) -> Filesdata | None:
         """
-        批量加载文件为DataFrame or 字典
+        批量加载数据文件
 
         Parameters
         ----------
         merge : bool, default: True
-            是否将所有文件按列合并为单个DataFrame返回
+            是否将所有加载数据合并为单个DataFrame返回
         mode : str, default: 'hstack'
             合并模式, 'hstack'按列合并, 'vstack'按行合并 (仅当merge=True时有效)
         isParallel : bool, default: False
             是否并行读取
-        parallelCores : int, optional
+        parallelNum : int, optional
             并行读取时的线程数
         usePyarrow : bool, default: False
             是否启用 pyarrow 引擎加速文件读取(需安装 pyarrow 库)
-        **kwargs : dict
-            传递给底层读取函数(如 pd.read_csv)的额外参数
         """
         start_time = time()
         # 设置读取引擎
@@ -338,7 +338,7 @@ class Files:
         # ------------------------------------------------------------------------#
         # 批量读取文件
         df_list: List[pd.DataFrame] = Files._read_batch(
-            self.filepaths, lambda fp: Files._read_funcs[self.filetype](fp, **kwargs), isParallel, parallelCores
+            self.filepaths, lambda fp: Files._read_funcs[self.filetype](fp, **kwargs), isParallel, parallelNum
         )
 
         # 结果检查与处理
@@ -447,12 +447,12 @@ class Files:
         filepaths: List[Path],
         read_once_func: Callable[[Path], pd.DataFrame],
         isParallel: bool = False,
-        parallelCores: Optional[int] = None,
+        parallelNum: Optional[int] = None,
     ) -> List[pd.DataFrame]:
-        """通用批量读取文件方法"""
+        """批量数据文件读取方法"""
         if isParallel:
             cpu = os.cpu_count() or 1
-            max_workers = parallelCores or min(cpu * 2, len(filepaths))
+            max_workers = parallelNum or min(cpu, len(filepaths))
             logger.debug(f"并行读取开启: max_workers={max_workers}")
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 df_list = list(executor.map(read_once_func, filepaths))
@@ -590,9 +590,9 @@ class Folder(anytree.Node):
     -------
     info() -> None
         打印文件夹树形结构, 直观展示数据集节点内容
-    loadAll(**kwargs) -> Dict[str, filesData] | None
+    loadAll(**kwargs) -> Dict[str, Filesdata] | None
         加载当前数据文件夹及所有子节点挂载的 Files 对象
-    loadMatch(match, filter=None, query=None, **kwargs) -> Dict[str, filesData] | None
+    loadMatch(match, filter=None, query=None, **kwargs) -> Dict[str, Filesdata] | None
         搜索当前数据文件夹匹配子节点, 加载Files并对数据表格匹配筛选
     """
 
@@ -628,28 +628,51 @@ class Folder(anytree.Node):
         self._files: Files = value
 
     @staticmethod
-    def load_batch(listFiles: List[Files], **kwargs) -> Dict[str, filesData]:
+    def _load_batch(listFiles: List[Files], **kwargs) -> Dict[str, Filesdata]:
         """批量加载多个 Files 对象"""
-        dictfilesData: Dict[str, filesData] = {}
+        DictFilesdata: Dict[str, Filesdata] = {}
         for i, files in enumerate(listFiles):
-            df = files.load(**kwargs)
+            df = files.load(**kwargs)  # 使用统一的加载参数
             if df is None:
                 continue
-            dictfilesData[str(files.rootpath)] = df  # 使用根路径区分不同 Files 加载结果
+            DictFilesdata[str(files.rootpath)] = df  # 使用根路径区分不同 Files 加载结果
             logger.debug(f"Files批量加载进度: {i + 1}/{len(listFiles)} -> Files={files}")
-        return dictfilesData
+        return DictFilesdata
 
     # --------------------------------------------------------------------------------#
     # 外部用户接口
     def info(self) -> None:
         """打印文件夹树形结构, 直观展示数据集节点内容"""
-        print(f"[{self.path}]")
+        if self.is_root:
+            print(f"{self}")
+        else:
+            print(f"{self.root}: {self}")
         for pre, _, node in anytree.RenderTree(self):
             tag = f" → <Files> x {len(node._files)}" if hasattr(node, "_files") else ""
             print(f"{pre}{node.name}{tag}")
 
-    def loadAll(self, **kwargs) -> Dict[str, filesData] | None:
-        """加载当前数据文件夹及所有子节点挂载的 Files 对象"""
+    def loadAll(self, **kwargs) -> Dict[str, Filesdata] | None:
+        """
+        加载当前数据文件夹及所有子节点挂载的 Files 对象
+
+        Parameters
+        ----------
+        merge : bool, default: True
+            是否将所有加载数据合并为单个DataFrame返回
+        mode : str, default: 'hstack'
+            合并模式, 'hstack'按列合并, 'vstack'按行合并 (仅当merge=True时有效)
+        isParallel : bool, default: False
+            是否并行读取
+        parallelNum : int, optional
+            并行读取时的线程数
+        usePyarrow : bool, default: False
+            是否启用 pyarrow 引擎加速文件读取(需安装 pyarrow 库)
+
+        return
+        ------
+        Dict[str, Filesdata] | None
+            加载结果, 键为 Files 根路径字符串, 值为对应的 DataFrame
+        """
         # 搜集
         listFiles: List[Files] = []
         for node in anytree.PreOrderIter(self):
@@ -663,12 +686,12 @@ class Folder(anytree.Node):
         # ------------------------------------------------------------------------#
         # 加载
         logger.debug(f"Folder加载开始: node={self.name}, count={len(listFiles)}")
-        dictfilesData = Folder.load_batch(listFiles, **kwargs)
-        if not dictfilesData:
+        DictFilesdata = Folder._load_batch(listFiles, **kwargs)
+        if not DictFilesdata:
             logger.warning(f"Folder加载终止: node={self.name}, reason=未从任何Files中读取到有效数据")
             return None
-        logger.info(f"Folder加载完成: node={self.name}, count={len(listFiles)}, success={len(dictfilesData)}")
-        return dictfilesData
+        logger.info(f"Folder加载完成: node={self.name}, count={len(listFiles)}, success={len(DictFilesdata)}")
+        return DictFilesdata
 
     def loadMatch(
         self,
@@ -676,8 +699,35 @@ class Folder(anytree.Node):
         filter: Optional[str] = None,
         query: Optional[str] = None,
         **kwargs,
-    ) -> Dict[str, filesData] | None:
-        """搜索当前数据文件夹匹配子节点, 加载Files并对数据表格匹配筛选"""
+    ) -> Dict[str, Filesdata] | None:
+        """
+        加载匹配工况文件夹挂载的 Files 对象, 并对加载结果进行筛选
+
+        Parameters
+        ----------
+        match : str
+            搜索关键词字符串, 支持逗号、空格分隔的多个关键词, 进行工况链匹配.
+            例如: '工况A,工况B' 将匹配包含工况A和工况B的任一节点, 以及其子树节点
+        filter : str, optional
+            使用文件名正则模式匹配进行数据文件筛选
+        query : str, optional
+            使用 DataFrame.query 语法进行数据文件筛选, 例如 'size[MB] > 1.0'
+        merge : bool, default: True
+            是否将所有加载数据合并为单个DataFrame返回
+        mode : str, default: 'hstack'
+            合并模式, 'hstack'按列合并, 'vstack'按行合并 (仅当merge=True时有效)
+        isParallel : bool, default: False
+            是否并行读取
+        parallelNum : int, optional
+            并行读取时的线程数
+        usePyarrow : bool, default: False
+            是否启用 pyarrow 引擎加速文件读取(需安装 pyarrow 库)
+
+        return
+        ------
+        Dict[str, Filesdata] | None
+            加载结果, 键为 Files 根路径字符串, 值为对应的 DataFrame
+        """
         # ------------------------------------------------------------------------#
         # 1. 匹配子节点搜索
         logger.debug(f"Folder检索开始: node={self.name}, match={match}")
@@ -733,20 +783,20 @@ class Folder(anytree.Node):
             return None
         logger.debug(f"Folder加载开始: node={self.name}, count={len(listFiles)}")
         # 调用静态批量加载接口
-        dictfilesData = Folder.load_batch(listFiles, **kwargs)
-        if not dictfilesData:
+        DictFilesdata = Folder._load_batch(listFiles, **kwargs)
+        if not DictFilesdata:
             logger.warning(f"Folder检索加载终止: node={self.name}, reason=检索到的Files无任何数据")
             return None
         logger.info(
-            f"Folder检索加载完成: node={self.name}, match={match}, filter={filter}, query={query}, count={len(dictfilesData)}"  # noqa: E501
+            f"Folder检索加载完成: node={self.name}, match={match}, filter={filter}, query={query}, count={len(DictFilesdata)}"  # noqa: E501
         )
-        return dictfilesData
+        return DictFilesdata
 
 
 # --------------------------------------------------------------------------------------------#
 class Dataset(Folder):
     """
-    数据集文件夹扫描与管理类, 支持自动识别层级结构并发现、加载数据文件
+    数据集扫描与管理类, 支持自动识别层级结构并发现、加载数据文件, 支持嵌套键索引
 
     Parameters
     ----------
@@ -754,6 +804,8 @@ class Dataset(Folder):
         数据集根目录路径
     type : str
         目标数据文件类型, 支持: '.csv', '.txt', '.xlsx', '.mat'
+    name : str, default: ''
+        数据集名称
 
     Attributes
     ----------
@@ -761,23 +813,33 @@ class Dataset(Folder):
         数据集根目录路径
     filetype : str
         数据集数据文件类型
+    setname : str
+        数据集名称
+    allFolders : List[Folder]
+        数据集所有文件夹节点
+    allFiles : List[Files]
+        数据集包含的所有 Files 对象列表
     files : Files
         当前节点直接挂载的 Files 对象, 若该节点无数据文件则无该属性, 调用直接报错
 
 
     Methods
     -------
-    info() -> None
+    - info()
+            -> None
         打印数据集树形结构, 直观展示数据集节点内容
-    loadAll(**kwargs) -> Dict[str, filesData] | None
+    - loadAll(**kwargs)
+            -> Dict[str, Filesdata] | None
         加载整个数据集所有节点挂载的 Files 对象
-    loadMatch(match, filter=None, query=None, **kwargs) -> Dict[str, filesData] | None
+    - loadMatch(match, filter=None, query=None, **kwargs)
+            -> Dict[str, Filesdata] | None
         搜索数据集匹配节点, 加载Files并对数据表格匹配筛选
-    refresh() -> Self
+    - refresh()
+            -> Self
         刷新数据集结构, 重新扫描磁盘目录
     """
 
-    def __init__(self, root: str, type: str) -> None:
+    def __init__(self, root: str, type: str, name: str = "") -> None:
         # 1. 基础信息处理
         self._rootpath = Path(root).resolve()
         self._filetype = Files._check_filetype(type)
@@ -785,6 +847,7 @@ class Dataset(Folder):
         if not self._rootpath.exists() or not self._rootpath.is_dir():
             logger.error(f"Dataset初始化失败: root={self._rootpath}, reason=路径不存在或非文件夹")
             raise ValueError(f"root={self._rootpath}: 指定的路径不存在或不是文件夹")
+        self.setname = name
         # 2. 初始化树根节点 (继承自 Folder/anytree.Node)
         super().__init__(name=self._rootpath.name)
         logger.debug(f"Dataset初始化开始: root={self._rootpath}, type={self._filetype}")
@@ -802,6 +865,20 @@ class Dataset(Folder):
         """数据集数据文件类型"""
         return self._filetype
 
+    @property
+    def allFolders(self) -> List[Folder]:
+        """数据集所有工况文件夹节点"""
+        return self.leaves
+
+    @property
+    def allFiles(self) -> List[Files]:
+        """数据集包含的所有 Files 对象"""
+        files_list: List[Files] = []
+        for node in anytree.PreOrderIter(self):
+            if hasattr(node, "_files"):
+                files_list.append(node._files)
+        return files_list
+
     # --------------------------------------------------------------------------------#
     # Python特性支持
     def __len__(self) -> int:
@@ -809,7 +886,7 @@ class Dataset(Folder):
         return self._validnode
 
     def __repr__(self) -> str:
-        return f"Dataset(root=[{self.rootpath.name}/], type={self.filetype}, count={self._validnode})"
+        return f"Dataset(name={self.setname}, root=[{self.rootpath}], type={self.filetype}, nodes={self._validnode})"  # noqa: E501
 
     # --------------------------------------------------------------------------------#
     # 目录扫描与结构构建内部方法
