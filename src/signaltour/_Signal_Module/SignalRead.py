@@ -382,8 +382,25 @@ class Files:
         return all_df
 
     def preview(self, num: int = 1, **kwargs) -> List[pd.DataFrame] | None:
-        """
+        r"""
         使用指定读取参数, 随机加载数据文件供预览
+
+        read_csv:
+        ```
+        "sep": "字符串：指定字段分隔符，例如 ',' 或 '\t'",
+        "header": "整数或列表：指定作为列名的行号，若无列名设为 None",
+        "names": "列表：自定义列名，当 header=None 时非常有用",
+        "index_col": "整数或字符串：指定作为行索引的列",
+        "usecols": "列表：仅读取指定的列（索引或名称），可大幅减少内存占用",
+        "skiprows": "整数或列表：跳过文件开头的若干行或指定的行号",
+        "skipfooter": "整数：跳过文件末尾的若干行",
+        "nrows": "整数：仅读取文件前 N 行数据",
+        "dtype": "字典：强制指定列的数据类型，如 {'ID': int}",
+        "encoding": "字符串：指定文件编码格式，如 'utf-8' 或 'gbk'",
+        "na_values": "标量、列表或字典：指定哪些值应识别为 NaN",
+        "engine": "字符串：指定解析引擎，可选 'c' (快) 或 'python' (功能全面)",
+        "chunksize": "整数：指定分块读取的文件块大小（行数）"
+        ```
 
         Parameters
         ----------
