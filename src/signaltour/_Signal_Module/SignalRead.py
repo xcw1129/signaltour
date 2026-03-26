@@ -124,10 +124,9 @@ class Files:
         # ------------------------------------------------------------------------#
         # 验证文件有效性并收集基础信息
         if records is None:
-            logger.debug("Files初始化模式: mode=run-scan")
             if not rootpath.exists() or not rootpath.is_dir():
                 logger.error(f"Files初始化失败: root={rootpath}, reason=路径不存在或非文件夹")
-                raise ValueError(f"root={rootpath}: 指定的路径不存在或不是文件夹")
+                raise ValueError("输入的目录路径不存在或不是文件夹")
             # ----------------------------------------------------------------#
             # 筛选有效数据文件名列表
             if names is None:
@@ -135,6 +134,7 @@ class Files:
                 valid_names: List[str] = [
                     f.name for f in rootpath.iterdir() if f.is_file() and f.suffix.lower() == filetype
                 ]
+                found = len(valid_names)
             else:
                 # 若传入 names 则仅验证这些文件的有效性
                 valid_names: List[str] = []
@@ -143,7 +143,8 @@ class Files:
                     if fp.exists() and fp.is_file() and fp.suffix.lower() == filetype:
                         valid_names.append(name)
                     else:
-                        logger.warning(f"Files初始化异常: name={name}, reason=文件不存在或类型不匹配")
+                        logger.warning(f"Files初始化异常: root={rootpath}, name={name}, reason=文件不存在或类型不匹配")
+                found = "N/A"
             # ----------------------------------------------------------------#
             # 对目标数据文件进行元数据收集
             records = []
@@ -158,27 +159,26 @@ class Files:
                         "modifiedTime": stat.st_mtime,
                     }
                 )
+            found = len(valid_names)
         else:
-            logger.debug("Files初始化模式: mode=pre-stat")
+            found = "N/A"
         # ------------------------------------------------------------------------#
         # 构建核心注册表 (保持传入顺序)
         self._fileTable: pd.DataFrame = pd.DataFrame(records)
         if self._fileTable.empty:  # 传入或扫描的数据文件注册表为空
-            self._fileTable = pd.DataFrame({"name": [], "size[MB]": [], "modifiedTime": []})
-            logger.warning(f"Files初始化异常: root={rootpath}, reason=未找到任何有效数据文件")
+            self._fileTable = pd.DataFrame(columns=Files._fileTableCols)
+            logger.warning(f"Files初始化异常: root={rootpath}, reason=无有效数据文件")
         # 处理表格数据并记录元数据属性
         self._fileTable["size[MB]"] = self._fileTable["size[MB]"] / (1024 * 1024)  # 转换为MB单位
         self._fileTable["modifiedTime"] = pd.to_datetime(self._fileTable["modifiedTime"], unit="s").round("s")
         self._fileTable.attrs["rootpath"] = rootpath
         self._fileTable.attrs["filetype"] = filetype
-        # 进行最终表列验证
+        # 进行最终注册表验证
         if self._fileTable.columns.tolist() != Files._fileTableCols:
-            logger.error(
-                f"Files初始化失败: root={rootpath}, columns={self._fileTable.columns.tolist()}, reason=数据文件表列异常"
-            )
-            raise RuntimeError("数据文件表列异常, 无法完成 Files 对象初始化")
+            logger.error(f"Files初始化失败: root={rootpath}, reason=文件注册表异常")
+            self._fileTable = pd.DataFrame(columns=Files._fileTableCols)
         logger.info(
-            f"Files初始化完成: root={rootpath}, total={len(names) if names is not None else 'N/A'}, valid={len(self._fileTable)}"  # noqa: E501
+            f"Files初始化完成: root={rootpath}, target={len(names) if names is not None else 'N/A'}, found={found}, valid={len(self._fileTable)}"  # noqa: E501
         )
 
     _fileTableCols: List[str] = ["name", "size[MB]", "modifiedTime"]
@@ -215,16 +215,13 @@ class Files:
 
     def _new_from_records(self, table: pd.DataFrame) -> Self:
         """从传入的数据文件注册表创建新的Files实例并继承元数据"""
-        new_obj = type(self).__new__(type(self))
+        new_files = type(self).__new__(type(self))
         if table.empty:
-            logger.warning("Files对象创建警告: reason=传入的数据文件注册表为空, 将创建一个空的Files对象")
-            new_obj._fileTable = pd.DataFrame({"name": [], "size[MB]": [], "modifiedTime": []})
+            new_files._fileTable = pd.DataFrame(columns=Files._fileTableCols)
         else:
-            new_obj._fileTable: pd.DataFrame = table.reset_index(drop=True)
-        new_obj._fileTable.attrs = self._fileTable.attrs.copy()
-        if new_obj._fileTable.columns.tolist() != Files._fileTableCols:
-            raise RuntimeError("数据文件表列异常, 无法完成 Files 对象初始化")
-        return new_obj
+            new_files._fileTable: pd.DataFrame = table.reset_index(drop=True)
+        new_files._fileTable.attrs = self._fileTable.attrs.copy()
+        return new_files
 
     def __getitem__(self, item) -> Self:
         """支持整数/切片/字符串/字符串列表索引, 返回子文件Files对象"""
@@ -299,9 +296,7 @@ class Files:
         def natural_sort_key(s):
             return tuple(int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s))
 
-        logger.debug(f"Files排序开始: root={self.rootpath}, by={by}, ascending={ascending}, natural={natural}")
         if self._fileTable.empty:
-            logger.warning("Files排序终止: reason=当前Files对象为空")
             return self
         df: pd.DataFrame = self._fileTable.copy()
         if by == "name" and natural:
@@ -312,11 +307,7 @@ class Files:
         # 就地更新文件表
         self._fileTable = df.reset_index(drop=True)
         if self._fileTable.columns.tolist() != Files._fileTableCols:
-            logger.error(
-                f"Files排序失败: root={self.rootpath}, columns={self._fileTable.columns.tolist()}, reason=数据文件表列异常"  # noqa: E501
-            )
             raise RuntimeError("数据文件表列异常, 无法完成排序操作")
-        logger.info(f"Files排序完成: root={self.rootpath}, count={len(df)}")
         return self
 
     def load(
@@ -355,13 +346,12 @@ class Files:
             if util.find_spec("pyarrow") is not None:
                 for params in Files._read_params.keys():
                     Files._read_params[params]["engine"] = "pyarrow"
-                logger.debug(f"Files读取引擎设置成功: root={self.rootpath}, currentEngine=pyarrow")
             else:
                 # 继续使用pandas默认C引擎
-                logger.warning(
-                    f"Files读取引擎设置无效: root={self.rootpath}, currentEngine=C, reason=当前环境未安装pyarrow库"
-                )
-        logger.info(f"Files加载开始: root={self.rootpath}, count={len(self)}, merge={merge}, parallel={isParallel}")
+                logger.warning("Files读取引擎设置无效: reason=当前环境未安装pyarrow库")
+        logger.info(
+            f"Files加载开始: root={self.rootpath}, count={len(self)}, merge={merge}, mode={mode}, isParallel={isParallel}, parallelNum={parallelNum}, usePyarrow={usePyarrow}"
+        )  # noqa: E501
         # ------------------------------------------------------------------------#
         # 批量读取文件
         df_list: List[pd.DataFrame] = Files._read_batch(
