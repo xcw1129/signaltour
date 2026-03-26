@@ -17,19 +17,19 @@
     - function:
         - `set_logging_level`: 设置当前模块的日志显示级别
     - class:
-        - `Files`: 数据文件批量管理类, 支持同根目录下单一格式文件的快速筛选与批量加载
-        - `Folder`: 数据文件夹管理类, 支持快速预览和批量检索加载数据文件
-        - `Dataset`: 数据集文件夹扫描与管理类, 支持自动识别层级结构并发现、加载数据文件
+        - `Files`: 数据文件批量管理类, 支持单一目录下指定类型数据文件的快速筛选与批量加载
+        - `Folder`: 数据文件夹管理类, 支持快速预览和批量检索、筛选和加载数据文件
+        - `Dataset`: 数据集扫描与管理类, 支持自动识别层级结构并发现、加载数据文件, 支持嵌套键索引
 ### SignalSimulate
     - function:
         - `periodic`: 生成仿真含噪准周期信号
         - `impulse`: 生成仿真冲击序列和噪声冲击复合信号
         - `modulation`: 生成仿真含噪调制信号
-### SignalSampling
+### SignalSample
     - function:
-        - `resample`: 对信号序列 Sig 进行任意时间段的重采样，支持下采样与上采样多种方式。
-        - `pad`: 对信号对象进行边界延拓处理，支持镜像延拓和零填充方式
-        - `slice`: 对信号进行滑窗跳步分段，首尾段自动延拓
+        - `resample`: 截取信号任意时间段并重采样, 支持下采样与上采样
+        - `pad`: 对信号对象进行边界延拓处理, 支持镜像延拓和零填充方式
+        - `slice`: 对信号进行滑窗跳步分段, 首尾段自动延拓
 ### SignalFilt
     - function:
         - `filtFIR`: 基于有限冲击响应滤波器对信号进行各种类型滤波
@@ -48,6 +48,4 @@ from ._Signal_Module.SignalFilt import *
 if __name__ == "__main__":
     from script.docstring import update_package_docstring
 
-    update_package_docstring(
-        __file__, summary="信号数据读取、生成、封装和预处理等数据管理子包"
-    )
+    update_package_docstring(__file__, summary="信号数据读取、生成、封装和预处理等数据管理子包")
