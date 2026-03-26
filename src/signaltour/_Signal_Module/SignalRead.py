@@ -350,8 +350,8 @@ class Files:
                 # 继续使用pandas默认C引擎
                 logger.warning("Files读取引擎设置无效: reason=当前环境未安装pyarrow库")
         logger.info(
-            f"Files加载开始: root={self.rootpath}, count={len(self)}, merge={merge}, mode={mode}, isParallel={isParallel}, parallelNum={parallelNum}, usePyarrow={usePyarrow}"
-        )  # noqa: E501
+            f"Files加载开始: root={self.rootpath}, count={len(self)}, merge={merge}, mode={mode}, isParallel={isParallel}, parallelNum={parallelNum}, usePyarrow={usePyarrow}"  # noqa: E501
+        )
         # ------------------------------------------------------------------------#
         # 批量读取文件
         df_list: List[pd.DataFrame] = Files._read_batch(

@@ -16,7 +16,7 @@
 
 import marimo
 
-__generated_with = "0.20.4"
+__generated_with = "0.21.1"
 app = marimo.App(width="medium", app_title="test_Signal")
 
 with app.setup(hide_code=True):
@@ -261,14 +261,14 @@ def test_Signal():
     axis = Signal.t_Axis(len(data), fs=10)
     Signal.Signal._COPY_DATA_WHEN_INIT = False
     signal = Signal.Signal(
-        data=data, axis=axis, name="振动", unit="$m/s^2$", label="测点信号"  
+        data=data, axis=axis, name="振动", unit="$m/s^2$", label="测点信号"
     )
     assert isinstance(signal, Signal.Signal)
     # 测试方法
-    fig,axs=signal.plot()
+    fig, axs = signal.plot()
     assert isinstance(fig, plt.Figure)
-    mo.output.append(fig)  
-    fig,axs=np.abs(signal.to_Spectra()).halfCut().plot()
+    mo.output.append(fig)
+    fig, axs = np.abs(signal.to_Spectra()).halfCut().plot()
     mo.output.append(fig)
 
 
@@ -286,11 +286,11 @@ def test_Spectra():
     data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
     axis = Signal.f_Axis(len(data), df=1)
     spectra = Signal.Spectra(
-        data=data, axis=axis, name="幅值", unit="$m/s^2$", label="测点信号"  
+        data=data, axis=axis, name="幅值", unit="$m/s^2$", label="测点信号"
     )
     assert isinstance(spectra, Signal.Spectra)
     # 测试方法
-    fig,axs=spectra.plot()
+    fig, axs = spectra.plot()
     assert isinstance(fig, plt.Figure)
     mo.output.append(fig)
 
@@ -306,9 +306,59 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    ### Signal.Files()
+    """)
+    return
+
+
+@app.cell
+def _():
+    files = Signal.Files(
+        root=r"R:\Data\PHM数据库\学术公开数据集\寿命预测\XJTU_轴承加速退化振动数据集\Data\35Hz12kN\Bearing1_1",
+        type="csv",
+    )
+    files
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### Signal.Folder()
+    """)
+    return
+
+
+@app.cell
+def _(dataset):
+    folder = dataset["12k Drive End Bearing Fault Data"]
+    folder.info()
+    return (folder,)
+
+
+@app.cell
+def _(folder):
+    folder.loadMatch(match="0007", merge=False)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     ### Signal.Dataset()
     """)
     return
+
+
+@app.cell
+def _():
+    dataset = Signal.Dataset(
+        root=r"R:\Data\PHM数据库\学术公开数据集\故障诊断\CWRU_轴承故障振动数据集\Data",
+        type=".mat",
+        name="CWRU轴承故障振动数据集",
+    )
+    dataset.info()
+    return (dataset,)
 
 
 @app.cell(hide_code=True)
@@ -343,7 +393,7 @@ def _():
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     mo.md(r"""
     ## 4. SignalSample模块
@@ -351,7 +401,7 @@ def _():
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     mo.md(r"""
     ### Signal.resample()
@@ -360,20 +410,14 @@ def _():
 
 
 @app.cell
-def _(signal):
-    signal
-    return
-
-
-@app.cell
 def _():
-    t_axis=Signal.t_Axis(N=1000, fs=1000)
-    data=np.random.randn(1000)
-    signal=Signal.Signal(data=data, axis=t_axis, name="随机信号", unit="V")
-    x=signal.data[:100]
-    x=x[::2]
+    t_axis = Signal.t_Axis(N=1000, fs=1000)
+    data = np.random.randn(1000)
+    signal = Signal.Signal(data=data, axis=t_axis, name="随机信号", unit="V")
+    x = signal.data[:100]
+    x = x[::2]
     x.flags
-    return (signal,)
+    return
 
 
 if __name__ == "__main__":
