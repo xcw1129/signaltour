@@ -1001,5 +1001,4 @@ class Dataset(Folder):
         self._validnode = 0
         # 重新扫描
         self._scan_structure(self._rootpath, self)
-        logger.info(f"Dataset刷新完成: root={self._rootpath}, count={self._validnode}")
         return self
