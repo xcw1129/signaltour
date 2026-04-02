@@ -78,7 +78,7 @@ class BaseAnalysis:
         Parameters
         ----------
         PlotFunc : callable
-            执行绘图操作的函数, 需与被装饰方法的返回值格式兼容
+            执行绘图操作的函数, 需与被装饰函数的返回值格式兼容
 
         Returns
         -------

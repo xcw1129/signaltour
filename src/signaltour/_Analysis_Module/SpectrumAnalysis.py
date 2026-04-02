@@ -18,9 +18,10 @@ __all__ = [
     "convolveCycle",
     "convolve",
     "Spectrum",
+    "Hilbert",
 ]
 
-from .._Assist_Module.Dependencies import Callable, Optional, fft, linalg, np, signal, Literal
+from .._Assist_Module.Dependencies import Callable, Optional, fft, linalg, np, signal
 from .._Plot_Module.LinePlot import PlotFunc_spectrum
 from .._Signal_Module.core import Signal, Spectra, f_Axis
 from .core import BaseAnalysis
@@ -297,20 +298,44 @@ class Spectrum(BaseAnalysis):
         计算序列数据的逆离散傅里叶变换
 
     - ft(symmetric: bool = False) -> Spectra
-        计算能量信号在0~N/2*Δf范围傅里叶变换的离散近似
+        计算能量信号在0~N/2*Δf范围内傅里叶变换的离散近似
 
     - cft(winType: str = "汉宁窗", padTimes: int = 3) -> Spectra
-        计算功率信号在0~N/2*Δf范围傅里叶级数系数的离散近似
+        计算功率信号在0~N/2*Δf范围内傅里叶级数系数的离散近似
 
     - psd(averageTimes: int = 10, type: str = "功率") -> Spectra
-        估计带噪声功率信号在0~N/2*Δf范围的功率分布
+        估计带噪声功率信号在0~N/2*Δf范围内的功率分布
+
+    - psdDiff(Sig_ref: Signal, averageTimes: int = 10, mode: str = "absolute") -> Spectra
+        计算与参考信号的差分功率谱
 
     - enveSpectra() -> Spectra
-        计算信号的希尔伯特包络幅值谱
-
-    - DiffSpectra(Sig_ref: Signal, averageTimes: int = 10, mode: str = "absolute") -> Spectra
-        计算信号与输入参考信号的差分功率谱
+        计算希尔伯特包络幅值谱
     """
+
+    def __init__(
+        self,
+        Sig: Signal,
+        isLinked: bool = True,
+        isPlot: bool = False,
+        **kwargs,
+    ):
+        """
+        平稳信号频谱分析方法类
+
+        Parameters
+        ----------
+        Sig : Signal
+            待分析信号
+        isLinked : bool, default: True
+            是否链接信号原始数据
+        isPlot : bool, default: False
+            是否绘制分析结果图
+        """
+        self.Sig = Sig if isLinked else Sig.copy()
+        self.isPlot = isPlot
+        self.plot_kwargs = kwargs
+        self.plot_kwargs.setdefault("isFindPeaks", True)  # 默认启用谱线峰值标记
 
     @staticmethod
     def _dft(data: np.ndarray) -> np.ndarray:
@@ -530,13 +555,99 @@ class Spectrum(BaseAnalysis):
 
         return Spc_diff
 
-    @BaseAnalysis._plot(PlotFunc_spectrum)
-    def enveSpectra(self) -> Spectra:
-        """计算希尔伯特包络幅值谱"""
-        # 计算包络幅值
-        analytic = signal.hilbert(self.Sig.data)
-        envelope = np.abs(analytic)
-        # 计算幅值谱
-        Spc_Amp: Spectra = Spectrum(self.Sig.template(envelope)).cft(padTimes=3)
-        Spc_Amp.name = "包络幅值"
-        return Spc_Amp
+
+# --------------------------------------------------------------------------------------------#
+class Hilbert(BaseAnalysis):
+    """
+    单成分调制信号希尔伯特分析方法类
+
+    Attributes
+    ----------
+    Sig : Signal
+        待分析信号
+    isPlot : bool
+        是否绘制分析结果图
+    plot_kwargs : dict
+        自定义绘图参数
+
+    Methods
+    -------
+    - analytic() -> Signal
+        计算解析信号
+
+    - amplitude() -> Signal
+        计算包络幅值
+
+    - phase() -> Signal
+        计算瞬时相位
+
+    - frequency() -> Signal
+        计算瞬时频率
+
+    - envelopeSpectrum() -> Spectra
+        计算包络幅值谱
+
+    """
+
+    def __init__(
+        self,
+        Sig: Signal,
+        isLinked: bool = True,
+        isPlot: bool = False,
+        **kwargs,
+    ):
+        """
+        单成分调制信号希尔伯特分析方法类
+
+        Parameters
+        ----------
+        Sig : Signal
+            待分析信号
+        isLinked : bool, default: True
+            是否链接信号原始数据
+        isPlot : bool, default: False
+            是否绘制分析结果图
+        """
+        self.Sig: Signal = Sig if isLinked else Sig.copy()
+        self.isPlot: bool = isPlot
+        self.plot_kwargs: dict = kwargs
+        self.plot_kwargs.setdefault("isFindPeaks", True)  # 默认启用谱线峰值标记
+
+    def analytic(self) -> Signal:
+        """计算解析信号"""
+        analytic: np.ndarray = signal.hilbert(self.Sig.data)
+        Sig_analytic: Signal = self.Sig.template(analytic)
+        Sig_analytic.name = "解析幅值"
+        return Sig_analytic
+
+    def amplitude(self) -> Signal:
+        """计算包络幅值"""
+        Sig_analytic: Signal = self.analytic()
+        amplitude: np.ndarray = np.abs(Sig_analytic.data)
+        Sig_amplitude: Signal = self.Sig.template(amplitude)
+        Sig_amplitude.name = "包络幅值"
+        return Sig_amplitude
+
+    def phase(self) -> Signal:
+        """计算瞬时相位"""
+        Sig_analytic: Signal = self.analytic()
+        phase: np.ndarray = np.angle(Sig_analytic.data)
+        Sig_phase: Signal = self.Sig.template(phase)
+        Sig_phase.name, Sig_phase.unit = "瞬时相位", "rad"
+        return Sig_phase
+
+    def frequency(self) -> Signal:
+        """计算瞬时频率"""
+        Sig_phase: Signal = self.phase()
+        # 计算相位的一阶差分并除以采样间隔得到瞬时频率
+        insFreq = np.gradient(Sig_phase.data, self.Sig.t_axis.dt) / (2 * np.pi)
+        Sig_freq = self.Sig.template(insFreq)
+        Sig_freq.name, Sig_freq.unit = "瞬时频率", "Hz"
+        return Sig_freq
+
+    def envelopeSpectrum(self) -> Spectra:
+        """计算包络幅值谱"""
+        Sig_amplitude: Signal = self.amplitude()
+        Spc_envelope: Spectra = Spectrum(Sig_amplitude).cft(padTimes=3)
+        Spc_envelope.name = "包络幅值"
+        return Spc_envelope
