@@ -6,19 +6,21 @@
 ## 可用的接口
 
     - function:
-        - `window`: 生成各类窗函数的整周期采样序列
+        - `get_window`: 生成各类窗函数的整周期采样序列
         - `find_spectralines`: 对序列数据进行谱线类局部峰值检测
     - class:
-        - `SpectrumAnalysis`: 平稳信号频谱分析方法
+        - `Spectrum`: 平稳信号频谱分析方法
 """
 
 __all__ = [
-    "window",
+    "get_window",
     "find_spectralines",
-    "SpectrumAnalysis",
+    "convolveCycle",
+    "convolve",
+    "Spectrum",
 ]
 
-from .._Assist_Module.Dependencies import Callable, Optional, fft, linalg, np, signal
+from .._Assist_Module.Dependencies import Callable, Optional, fft, linalg, np, signal, Literal
 from .._Plot_Module.LinePlot import PlotFunc_spectrum
 from .._Signal_Module.core import Signal, Spectra, f_Axis
 from .core import BaseAnalysis
@@ -28,7 +30,7 @@ from .core import BaseAnalysis
 # --------------------------------------------------------------------------------#
 # ------------------------------------------------------------------------#
 # ----------------------------------------------------------------#
-def window(
+def get_window(
     num: int,
     type: str = "汉宁窗",
     winParam: Optional[float] = None,
@@ -37,7 +39,7 @@ def window(
     func: Optional[Callable] = None,
 ) -> np.ndarray:
     """
-    生成各类窗函数的整周期采样序列
+    生成指定窗函数的整周期采样序列
 
     Parameters
     ----------
@@ -63,7 +65,7 @@ def window(
 
     See Also
     --------
-    - scipy.signal.get_window : 各种窗函数序列生成
+    - scipy.signal.get_window
 
     Notes
     -----
@@ -90,13 +92,15 @@ def window(
     # 对称窗: t= n/(num-1), n=0,1/(num-1),2/(num-1),.., 1
     # 非对称窗: t=n/num=0,1/num,2/num,..(num//2)/num,..,(num-1)/num
     if type == "自定义窗":
+        if not isinstance(func, Callable):
+            raise ValueError(f"`func`错误. `type`='自定义窗'时, 需通过`func`指定窗函数. 当前`func`={func}")
         n = np.arange(num)  # n=0,1,2,3,...,N-1
         if symmetric:
-            data = func(n / (num - 1))
+            data = func(n / (num - 1))  # t= 0,...,1
         else:
-            data = func(n / num)
+            data = func(n / num)  # t= 0,...,(N-1)/N
     elif type not in window_name.keys():
-        raise ValueError(f"type={type}: 不支持的窗函数类型")
+        raise ValueError(f"`type`不支持. 可选类型: {list(window_name.keys())}. 当前`type`={type}")
     else:
         if type in ["高斯窗", "凯泽窗"] and winParam is not None:
             window = (window_name[type], winParam)
@@ -108,7 +112,7 @@ def window(
     # --------------------------------------------------------------------------------#
     # 进行双边零填充
     if padding is not None:
-        data = np.pad(data, padding, mode="constant")  # 双边各填充padding点, 共延长2*padding点
+        data = np.pad(data, padding, mode="constant")
     return data
 
 
@@ -118,25 +122,25 @@ def find_spectralines(
     distance: float = 0.01,
 ) -> np.ndarray:
     """
-    对序列数据进行谱线类局部峰值检测
+    检测谱数据中的谱线类局部峰值
 
     Parameters
     ----------
     data : np.ndarray
-        一维序列数据, 元素为非负实数
+        谱数据
     threshold : float, default: 0.8
         邻域稀疏度阈值, 输入范围: (1/sqrt(d*2+1), 1)
     distance : float, default: 0.01
-        峰值最小间距, 若<1则表示数据总长度的比例, 若>1则表示数据点数
+        峰值最小间距. 若<1则表示数据总长度的比例, 若>1则表示数据点数
 
     Returns
     -------
     np.ndarray
-        满足谱线特征的峰值索引数组
+        峰值索引数组
 
     Notes
     -----
-    方法使用signal.find_peaks函数初步筛选局部峰值点, 然后结合谱线邻域稀疏度判据进行二次筛选。
+    方法使用signal.find_peaks函数初步筛选局部峰值点, 然后结合谱线邻域稀疏度判据进行二次筛选
     """
 
     def sparsity(x: np.ndarray) -> float:
@@ -151,27 +155,129 @@ def find_spectralines(
         distance = int(len(data) * distance)
     else:
         distance = int(distance)
-    lines_idx, _ = signal.find_peaks(data, distance=distance + 1)  # +1确保峰值间距至少为distance
+    peaks_idx, _ = signal.find_peaks(data, distance=distance + 1)  # +1确保峰值间距至少为distance
     # 二次筛选谱线类峰值
-    valid_lines_idx = []
-    for idx in lines_idx:
+    line_peaks_idx = []
+    for idx in peaks_idx:
         # 取出峰值邻域数据段
         seg = data[max(0, idx - distance) : min(len(data), idx + distance + 1)]
-        if max(seg) != data[idx]:
-            continue  # 非峰值点跳过
         # 计算稀疏度指标
-        seg_s = sparsity(seg)
+        seg_sparse = sparsity(seg)
         # 邻域稀疏的峰值判定为谱线
-        if seg_s < threshold:
-            valid_lines_idx.append(idx)
-    valid_lines_idx = np.array(valid_lines_idx)
-    return valid_lines_idx
+        if seg_sparse < threshold:
+            line_peaks_idx.append(idx)
+    line_peaks_idx = np.array(line_peaks_idx)
+    return line_peaks_idx
+
+
+def convolveCycle(x: np.ndarray, y: np.ndarray, method="fft") -> np.ndarray:
+    """
+    计算两个序列数据的循环卷积, 该卷积方式满足DFT的卷积定理
+
+    两个序列长度必须相等
+
+    method='direct'时输入序列我的长度推荐不超过16384, 避免计算过程占用2GB以上内存
+
+    Parameters
+    ----------
+    x : np.ndarray
+        序列1
+    y : np.ndarray
+        序列2
+    method : str, default: "fft"
+        卷积计算方式, 可选: "direct", "fft"
+
+    Returns
+    -------
+    np.ndarray
+        循环卷积结果
+    """
+    if len(x) != len(y):
+        raise ValueError(f"输入序列长度错误. 循环卷积要求输入序列长度相等. 当前len(x)={len(x)}, len(y)={len(y)}")
+    if method == "fft":
+        # 通过频域乘计算循环卷积
+        X_f = Spectrum.dft(x)
+        Y_f = Spectrum.dft(y)
+        Z_f = X_f * Y_f
+        # 还原时域得卷积结果
+        z_n = Spectrum.idft(Z_f).real
+        return z_n
+    elif method == "direct":
+        # 直接计算循环卷积
+        Y_pad_trans = linalg.circulant(np.conj(y))  # 循环卷积矩阵, circulant自动转置
+        z = np.dot(Y_pad_trans, x)  # 计算循环卷积的一个周期
+        return z
+    else:
+        raise ValueError(f"卷积计算方式`method`不支持. 可选方式: 'fft', 'direct'. 当前`method`={method}")
+
+
+def _convolve(x: np.ndarray, y: np.ndarray, method="fft") -> np.ndarray:
+    """
+    计算两个序列数据的线性卷积, 输出长度默认为 len(x)+len(y)-1, 即"full"模式
+
+    该方法仅用于演示序列数据的线性卷积计算过程, 实际计算使用 convolve
+
+    method='direct'时输入参数x和y的长度总和推荐不超过16384, 避免计算过程占用2GB以上内存
+
+    Parameters
+    ----------
+    x : np.ndarray
+        序列1
+    y : np.ndarray
+        序列2
+    method : str, default: "fft"
+        卷积计算方式, 可选: "direct", "fft"
+
+    Returns
+    -------
+    np.ndarray
+        线性卷积结果
+    """
+    N = len(x) + len(y) - 1  # 卷积结果长度
+    # 延拓数据以通过循环卷积计算线性卷积
+    x_pad = np.pad(x, (0, N - len(x)), mode="constant")
+    y_pad = np.pad(y, (0, N - len(y)), mode="constant")
+    # 执行循环卷积
+    z = convolveCycle(x_pad, y_pad, method=method)
+    return z
+
+
+def convolve(x: np.ndarray, y: np.ndarray, mode: str = "full") -> np.ndarray:
+    """
+    计算两个序列数据的线性卷积
+
+    该方法根据输入序列长度自动选择重叠相加法, 以实现快速计算
+
+    Parameters
+    ----------
+    x : np.ndarray
+        序列1
+    y : np.ndarray
+        序列2
+    mode : str, default: "full"
+        卷积结果长度模式, 可选: "full", "same", "valid"
+
+    Returns
+    -------
+    np.ndarray
+        线性卷积结果
+
+    See Also
+    --------
+    - scipy.signal.convolve
+    - scipy.signal.oaconvolve
+    """
+    if len(x) // len(y) >= 10:  # 当一个序列远长于另一个序列时(例如FIR滤波), 使用重叠相加法进行快速卷积
+        z = signal.oaconvolve(x, y, mode=mode)
+    else:
+        z = signal.convolve(x, y, mode=mode)  # 自动选择最快的卷积方法: direct or fft
+    return z
 
 
 # --------------------------------------------------------------------------------------------#
-class SpectrumAnalysis(BaseAnalysis):
+class Spectrum(BaseAnalysis):
     """
-    平稳信号频谱分析方法
+    平稳信号频谱分析方法类
 
     Attributes
     ----------
@@ -184,130 +290,34 @@ class SpectrumAnalysis(BaseAnalysis):
 
     Methods
     -------
-    - dft(data: np.ndarray)
-            -> np.ndarray
+    - dft(data: np.ndarray) -> np.ndarray
         计算序列数据的离散傅里叶变换
 
-    - idft(data: np.ndarray)
-            -> np.ndarray
+    - idft(data: np.ndarray) -> np.ndarray
         计算序列数据的逆离散傅里叶变换
 
-    - convolve(x: np.ndarray, y: np.ndarray, mode: str = "full")
-            -> np.ndarray
-        计算两个序列数据的线性卷积
-
-    - ft(symmetric: bool = False)
-            -> Spectra
+    - ft(symmetric: bool = False) -> Spectra
         计算能量信号在0~N/2*Δf范围傅里叶变换的离散近似
 
-    - cft(winType: str = "汉宁窗", padTimes: int = 3)
-            -> Spectra
+    - cft(winType: str = "汉宁窗", padTimes: int = 3) -> Spectra
         计算功率信号在0~N/2*Δf范围傅里叶级数系数的离散近似
 
-    - psd(averageTimes: int = 10, type: str = "功率")
-            -> Spectra
+    - psd(averageTimes: int = 10, type: str = "功率") -> Spectra
         估计带噪声功率信号在0~N/2*Δf范围的功率分布
 
-    - enveSpectra()
-            -> Spectra
+    - enveSpectra() -> Spectra
         计算信号的希尔伯特包络幅值谱
 
-    - DiffSpectra(Sig_ref: Signal, averageTimes: int = 10, mode: str = "absolute")
-            -> Spectra
+    - DiffSpectra(Sig_ref: Signal, averageTimes: int = 10, mode: str = "absolute") -> Spectra
         计算信号与输入参考信号的差分功率谱
     """
 
-    # ----------------------------------------------------------------------------------------#
-    # 离散卷积相关方法
-    @staticmethod
-    def cycleconvolve(x: np.ndarray, y: np.ndarray, method="fft") -> np.ndarray:
-        """
-        计算两个序列数据的循环卷积, 该卷积方式满足DFT的卷积定理
-
-        两个序列长度必须相等
-
-        method='direct'时输入参数的长度推荐不超过16384, 避免计算过程占用2GB以上内存
-
-        Parameters
-        ----------
-        x : np.ndarray
-            序列1
-        y : np.ndarray
-            序列2
-        method : str, default: "fft"
-            卷积计算方式, 可选: "direct", "fft"
-
-        Returns
-        -------
-        np.ndarray
-            循环卷积结果
-        """
-        if len(x) != len(y):
-            raise ValueError("循环卷积要求输入序列长度相等")
-        if method == "fft":
-            # 通过频域乘计算循环卷积
-            X_f = SpectrumAnalysis.dft(x)
-            Y_f = SpectrumAnalysis.dft(y)
-            Z_f = X_f * Y_f
-            # 还原时域得卷积结果
-            z_n = SpectrumAnalysis.idft(Z_f).real
-            return z_n
-        elif method == "direct":
-            # 直接计算循环卷积
-            Y_pad_trans = linalg.circulant(np.conj(y))  # 循环卷积矩阵, circulant自动转置
-            z = np.dot(Y_pad_trans, x)  # 计算循环卷积的一个周期
-            return z
-        else:
-            raise ValueError(f"method={method}: 不支持的卷积计算方法:")
-
-    @staticmethod
-    def _convolve(x: np.ndarray, y: np.ndarray, method="fft") -> np.ndarray:
-        """
-        计算两个序列数据的线性卷积, 输出长度默认为 len(x)+len(y)-1, 即"full"模式
-
-        该方法仅用于演示序列数据的线性卷积计算过程, 实际计算请使用 SpectrumAnalysis.convolve
-
-        method='direct'时输入参数x和y的长度总和推荐不超过16384, 避免计算过程占用2GB以上内存
-
-        Parameters
-        ----------
-        x : np.ndarray
-            序列1
-        y : np.ndarray
-            序列2
-        method : str, default: "fft"
-            卷积计算方式, 可选: "direct", "fft"
-
-        Returns
-        -------
-        np.ndarray
-            线性卷积结果
-        """
-        N = len(x) + len(y) - 1  # 卷积结果长度
-        # 延拓数据以使循环卷积与线性卷积等价
-        x_pad = np.pad(x, (0, N - len(x)), mode="constant")
-        y_pad = np.pad(y, (0, N - len(y)), mode="constant")
-        # 执行循环卷积
-        z = SpectrumAnalysis.cycleconvolve(x_pad, y_pad, method=method)
-        return z
-
-    @staticmethod
-    def convolve(x: np.ndarray, y: np.ndarray, mode: str = "full") -> np.ndarray:
-        """计算两个序列数据的线性卷积"""
-        if len(x) // len(y) >= 10:  # 当一个序列远长于另一个序列时(例如FIR滤波), 使用重叠相加法进行快速卷积
-            z = signal.oaconvolve(x, y, mode=mode)
-        else:
-            z = signal.convolve(x, y, mode=mode)  # 自动选择最快的卷积方法: direct or fft
-        return z
-
-    # ----------------------------------------------------------------------------------------#
-    # 傅里叶变换相关方法
     @staticmethod
     def _dft(data: np.ndarray) -> np.ndarray:
         """
         计算序列数据的离散傅里叶变换
 
-        该方法仅用于演示DFT计算过程, 实际计算请使用 SpectrumAnalysis.dft
+        该方法仅用于演示DFT计算过程, 实际计算使用 Spectrum.dft
 
         输入参数data的长度推荐不超过16384, 避免计算过程占用4GB以上内存
 
@@ -330,7 +340,7 @@ class SpectrumAnalysis(BaseAnalysis):
         """
         计算序列数据的逆离散傅里叶变换
 
-        该方法仅用于演示IDFT计算过程, 实际计算请使用 SpectrumAnalysis.idft
+        该方法仅用于演示IDFT计算过程, 实际计算使用 Spectrum.idft
 
         输入参数data的长度推荐不超过16384, 避免计算过程占用4GB以上内存
 
@@ -362,30 +372,40 @@ class SpectrumAnalysis(BaseAnalysis):
 
     @BaseAnalysis._plot(PlotFunc_spectrum)
     def ft(self, symmetric: bool = False) -> Spectra:
-        """计算能量信号在0~N/2*Δf范围傅里叶变换的离散近似"""
+        """
+        计算能量信号在0~N/2*Δf范围内傅里叶变换的离散近似
+
+        Parameters
+        ----------
+        symmetric : bool, default: False
+            是否生成零频率中心的对称频谱
+
+        Returns
+        -------
+        Spectra
+            傅里叶变换谱
+        """
         # 计算傅里叶变换: FT=DFT*Δt
-        # FT结果幅值随序列fs变化而变化, 因为信号被伸缩, 总能量分布变化
-        X_f = SpectrumAnalysis.dft(self.Sig.data) * self.Sig.t_axis.dt
+        X_f = Spectrum.dft(self.Sig.data) * self.Sig.t_axis.dt
         # 构造频谱对象
         Spc = Spectra(
             axis=self.Sig.f_axis,
             data=X_f,
-            name="密度",
+            name="幅值密度",
             unit=self.Sig.unit + "/Hz",
             label=self.Sig.label,
         )
+        Spc.data = np.abs(Spc.data)
         if symmetric:
             Spc.data = fft.fftshift(Spc.data)
             freq = fft.fftshift(fft.fftfreq(len(Spc), d=self.Sig.t_axis.dt))
             Spc.f_axis.f0, Spc.f_axis.df = freq[0], freq[1] - freq[0]
-        if self.isPlot:
-            return np.abs(Spc)
         return Spc
 
     @BaseAnalysis._plot(PlotFunc_spectrum)
     def cft(self, winType: str = "汉宁窗", padTimes: int = 3) -> Spectra:
         """
-        计算功率信号在0~N/2*Δf范围傅里叶级数系数的离散近似
+        计算功率信号在0~N/2*Δf范围内傅里叶级数系数的离散近似
 
         Parameters
         ----------
@@ -399,41 +419,53 @@ class SpectrumAnalysis(BaseAnalysis):
         Spectra
             傅里叶级数系数谱
         """
-        win = window(num=len(self.Sig), type=winType, padding=padTimes * len(self.Sig) // 2)
+        win = get_window(num=len(self.Sig), type=winType, padding=padTimes * len(self.Sig) // 2)
         scale = 1 / np.mean(win)  # 幅值补偿因子
         # 计算傅里叶级数系数: CFT=DFT/N
-        # CFT结果幅值不随序列fs变化而变化, 因为信号总功率分布不变
-        # CFT结果幅值随序列padding而变化, 因为信号被稀释, 总功率分布变化
         data_pad = np.pad(self.Sig.data, padTimes * len(self.Sig) // 2, mode="constant")
-        X_k = SpectrumAnalysis.dft(data_pad * win) / len(data_pad)
+        X_k = Spectrum.dft(data_pad * win) / len(data_pad)
         X_k = X_k * scale  # 幅值补偿
         # 构造频谱对象
         Spc = Spectra(
             axis=f_Axis(len(X_k), df=self.Sig.f_axis.df / (1 + padTimes)),
             data=X_k,
-            name="系数",
+            name="幅值",
             unit=self.Sig.unit,
             label=self.Sig.label,
         )
-        if self.isPlot:
-            return np.abs(Spc.halfCut())  # 单边截断
+        Spc.data = np.abs(Spc.data)
+        Spc.halfCut()
         return Spc
 
-    # ----------------------------------------------------------------------------------------#
-    # 噪声信号谱估计方法
     @BaseAnalysis._plot(PlotFunc_spectrum)
     def psd(self, averageTimes: int = 10, type: str = "功率") -> Spectra:
         """
-        估计带噪声功率信号在0~N/2*Δf范围的功率分布
+        估计带噪声功率信号在0~N/2*Δf范围内的功率分布
 
         功率谱中的峰值高度是信号震荡成分均方根幅值的估计值
 
         功率谱中的平坦部分平均是白噪声功率的估计值
+
+        Parameters
+        ----------
+        averageTimes : int, default: 10
+            功率谱平均次数. 平均次数越多, 频谱估计越稳定, 但谱分辨率越低. 推荐值范围: 5~20
+        type : str, default: "功率"
+            功率谱类型, 可选: '功率', '功率密度'
+
+        Returns
+        -------
+        Spectra
+            功率谱估计结果
+
+        See Also
+        --------
+        - scipy.signal.welch
         """
         nperseg = max(64, len(self.Sig) // averageTimes)  # 每段长度
         # 计算功率谱
         freq, P_k = signal.welch(
-            self.Sig._data,
+            self.Sig.data,
             fs=self.Sig.t_axis.fs,
             window="boxcar",
             nperseg=nperseg,
@@ -451,49 +483,34 @@ class SpectrumAnalysis(BaseAnalysis):
             unit=self.Sig.unit + ("^2" if type == "功率" else "^2/Hz"),
             label=self.Sig.label,
         )
-        if self.isPlot:
-            return Spc.halfCut()  # 单边截断
+        Spc.halfCut()
         return Spc
 
-    # ----------------------------------------------------------------------------------------#
-    # 其它平稳谱分析方法
     @BaseAnalysis._plot(PlotFunc_spectrum)
-    def enveSpectra(self) -> Spectra:
-        """计算信号的希尔伯特包络幅值谱"""
-        # 计算包络幅值
-        analytic = signal.hilbert(self.Sig)
-        envelope = np.abs(analytic)
-        # 计算幅值谱
-        Spc_Amp = SpectrumAnalysis(self.Sig.template(envelope)).cft(padTimes=3)
-        Spc_Amp = np.abs(Spc_Amp.halfCut())
-        Spc_Amp.name = "包络幅值"
-        return Spc_Amp
-
-    @BaseAnalysis._plot(PlotFunc_spectrum)
-    def DiffSpectra(
+    def psdDiff(
         self,
         Sig_ref: Signal,
         averageTimes: int = 10,
         mode: str = "absolute",
     ) -> Spectra:
         """
-        计算信号与输入参考信号的差分功率谱
+        计算与参考信号的差分功率谱
 
         Parameters
         ----------
         Sig_ref : Signal
             参考信号
         averageTimes : int, default: 10
-            计算功率谱时的平均次数
-        mode : str, default: "absolute"
+            功率谱平均次数. 平均次数越多, 频谱估计越稳定, 但谱分辨率越低. 推荐值范围: 5~20
+        mode : Literal["absolute", "relative", "log"], default: "absolute"
             计算模式:
             - "absolute": 绝对差值 (Spc2 - Spc1)
             - "relative": 相对变化率 (Spc2 - Spc1) / Spc1
             - "log": 对数差分 (dB), 10 * log10(Spc2 / Spc1)
         """
         # 计算两个信号的功率谱
-        Spc1 = SpectrumAnalysis(self.Sig).psd(averageTimes=averageTimes).halfCut()
-        Spc2 = SpectrumAnalysis(Sig_ref).psd(averageTimes=averageTimes).halfCut()
+        Spc1 = Spectrum(self.Sig).psd(averageTimes=averageTimes)
+        Spc2 = Spectrum(Sig_ref).psd(averageTimes=averageTimes)
 
         if mode == "absolute":
             Spc_diff = Spc2 - Spc1
@@ -509,6 +526,17 @@ class SpectrumAnalysis(BaseAnalysis):
             Spc_diff.name = "对数差分功率"
             Spc_diff.unit = "dB"
         else:
-            raise ValueError(f"不支持的模式: {mode}")
+            raise ValueError(f"计算模式`mode`不支持. 可选模式: 'absolute', 'relative', 'log'. 当前`mode`={mode}")
 
         return Spc_diff
+
+    @BaseAnalysis._plot(PlotFunc_spectrum)
+    def enveSpectra(self) -> Spectra:
+        """计算希尔伯特包络幅值谱"""
+        # 计算包络幅值
+        analytic = signal.hilbert(self.Sig.data)
+        envelope = np.abs(analytic)
+        # 计算幅值谱
+        Spc_Amp: Spectra = Spectrum(self.Sig.template(envelope)).cft(padTimes=3)
+        Spc_Amp.name = "包络幅值"
+        return Spc_Amp

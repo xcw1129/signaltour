@@ -64,9 +64,7 @@ class Axis:
         返回拷贝副本
     """
 
-    def __init__(
-        self, N: int, dx: float, x0: float = 0.0, name: str = "", unit: str = ""
-    ) -> None:
+    def __init__(self, N: int, dx: float, x0: float = 0.0, name: str = "", unit: str = "") -> None:
         """
         通用坐标轴类, 用于生成和管理一维顺序均匀采样坐标轴数据
 
@@ -95,9 +93,7 @@ class Axis:
     @property
     def data(self) -> np.ndarray:
         """坐标轴数组"""
-        return (
-            self._x0 + np.arange(self.N) * self._dx
-        )  # x=[x0,x0+dx,x0+2dx,...,x0+(N-1)dx]
+        return self._x0 + np.arange(self.N) * self._dx  # x=[x0,x0+dx,x0+2dx,...,x0+(N-1)dx]
 
     @property
     def lim(self) -> tuple[float, float]:
@@ -141,9 +137,7 @@ class Axis:
             )  # 递归分别转换
         # 仅对字符串类型进行物理坐标解析
         if isinstance(key, str):
-            pattern = (
-                r"^([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)" + re.escape(self.unit) + r"$"
-            )
+            pattern = r"^([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)" + re.escape(self.unit) + r"$"
             match = re.fullmatch(pattern, key)
             if not match:
                 raise IndexError(f"slice={key}: 物理坐标解析失败")
@@ -194,7 +188,9 @@ class Axis:
 
     def __repr__(self):
         """面向开发时"""
-        return f"{type(self).__name__}(N={self.N}, dx={self._dx}, x0={self._x0}, name='{self.name}', unit='{self.unit}')"  # noqa: E501
+        return (
+            f"{type(self).__name__}(N={self.N}, dx={self._dx}, x0={self._x0}, name='{self.name}', unit='{self.unit}')"  # noqa: E501
+        )
 
     # --------------------------------------------------------------------------------#
     # numpy兼容
@@ -331,11 +327,7 @@ class Series(NDArrayOperatorsMixin):
 
     def __eq__(self, other) -> bool:
         if isinstance(other, Series):
-            return (
-                self._axis == other._axis
-                and np.allclose(self._data, other._data)
-                and self.unit == other.unit
-            )
+            return self._axis == other._axis and np.allclose(self._data, other._data) and self.unit == other.unit
         return False  # 与非Series类型比较均返回False
 
     def __ne__(self, other) -> bool:
@@ -372,11 +364,7 @@ class Series(NDArrayOperatorsMixin):
         # 执行NumPy的函数操作
         res = func(*args, **kwargs)
         # 检查结果，保持返回类型一致
-        if (
-            isinstance(res, np.ndarray)
-            and res.shape == self._data.shape
-            and np.issubdtype(res.dtype, np.number)
-        ):
+        if isinstance(res, np.ndarray) and res.shape == self._data.shape and np.issubdtype(res.dtype, np.number):
             new_Srs = self.template(res)
             return new_Srs
         else:
@@ -407,19 +395,13 @@ class Series(NDArrayOperatorsMixin):
         ):  # 处理非逐元素操作（如add.reduce等，极少使用）
             res = getattr(ufunc, method)(*args, **kwargs)
             return res
-        elif (
-            method == "__call__" or method == "accumulate"
-        ):  # 处理逐元素运算（如abs、multiply等，常用）
+        elif method == "__call__" or method == "accumulate":  # 处理逐元素运算（如abs、multiply等，常用）
             res = getattr(ufunc, method)(*args, **kwargs)
             # 如果指定了out参数, 则直接返回out
             if out is not None:
                 return out if len(out) > 1 else out[0]
             # 检查结果，保持返回类型一致
-            if (
-                isinstance(res, np.ndarray)
-                and res.shape == self._data.shape
-                and np.issubdtype(res.dtype, np.number)
-            ):
+            if isinstance(res, np.ndarray) and res.shape == self._data.shape and np.issubdtype(res.dtype, np.number):
                 new_Srs = self.template(res)
                 return new_Srs
             else:
@@ -735,11 +717,9 @@ class Signal(Series):
     # 外部用户方法
     def to_Spectra(self) -> "Spectra":
         """转换信号到其频谱"""
-        from .._Analysis_Module.SpectrumAnalysis import SpectrumAnalysis
+        from .._Analysis_Module.SpectrumAnalysis import Spectrum
 
-        Spc = SpectrumAnalysis(self).cft(
-            winType="矩形窗", padTimes=0
-        )  # 保持原始长度, 不延拓
+        Spc = Spectrum(self).cft(winType="矩形窗", padTimes=0)  # 保持原始长度, 不延拓
         return Spc
 
 
@@ -817,9 +797,7 @@ class Spectra(Series):
     def halfCut(self) -> Self:
         """裁剪为单边谱"""
         if self.f_axis.f0 != 0.0:
-            raise ValueError(
-                f"f0={self.f_axis.f0}: 当前谱频率轴不完整, 无法进行单边谱裁剪"
-            )
+            raise ValueError(f"f0={self.f_axis.f0}: 当前谱频率轴不完整, 无法进行单边谱裁剪")
         N = len(self)
         if N % 2 == 0:  # 偶数点，非对称
             half_N = N // 2

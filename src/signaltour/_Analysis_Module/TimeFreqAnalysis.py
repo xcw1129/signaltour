@@ -17,7 +17,7 @@ from .._Plot_Module.ImagePlot import spectrogram_PlotFunc
 from .._Signal_Module.core import Signal
 from .._Signal_Module.SignalSample import slice
 from .core import BaseAnalysis
-from .SpectrumAnalysis import window
+from .SpectrumAnalysis import get_window
 
 
 # --------------------------------------------------------------------------------------------#
@@ -125,7 +125,7 @@ class STFTAnalysis(BaseAnalysis):
             mode="constant",
         )
         # 加窗
-        win = window(num=nperseg, type=winType, padding=padTimes * nperseg // 2)
+        win = get_window(num=nperseg, type=winType, padding=padTimes * nperseg // 2)
         segments = segments * win
         return segments, time
 

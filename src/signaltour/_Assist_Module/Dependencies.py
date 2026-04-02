@@ -16,6 +16,8 @@ from typing import (
     Self,
     Literal,
     Any,
+    TypeVar,
+    ParamSpec,
 )  # 类型注解
 from typing import Annotated, TypeAlias, TypeGuard  # 类型检查增强
 from typing import get_origin, get_args  # 类型注解工具

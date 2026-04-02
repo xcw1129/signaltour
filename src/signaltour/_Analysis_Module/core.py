@@ -1,5 +1,5 @@
 """
-# core: Analysis子包核心模块, 提供各种信号分析处理方法的基类接口
+# core: Analysis子包核心模块, 实现了信号分析处理方法的基础类与通用函数
 
 ---
 
@@ -13,8 +13,15 @@ __all__ = ["BaseAnalysis"]
 
 from .._Assist_Module.Dependencies import (
     Callable,
+    Optional,
+    ParamSpec,
+    TypeVar,
+    wraps,
 )
 from .._Signal_Module.core import Signal
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 # --------------------------------------------------------------------------------------------#
 # --------------------------------------------------------------------------------#
@@ -24,9 +31,9 @@ from .._Signal_Module.core import Signal
 
 class BaseAnalysis:
     """
-    通用信号分析处理方法类
+    通用信号分析处理方法基类
 
-    定义了一般信号处理算法必需初始化方法、常用属性和各种装饰器
+    定义了一般信号处理算法必需初始化方法, 常用属性和各种装饰器
 
     Attributes
     ----------
@@ -53,7 +60,7 @@ class BaseAnalysis:
         Sig : Signal
             待分析信号
         isLinked : bool, default: True
-            是否链接原始待分析信号
+            是否链接信号原始数据
         isPlot : bool, default: False
             是否绘制分析结果图
         """
@@ -62,13 +69,11 @@ class BaseAnalysis:
         self.plot_kwargs = kwargs
 
     @staticmethod
-    def _plot(PlotFunc: Callable) -> Callable:
+    def _plot(PlotFunc: Callable) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
         """
-        Analysis类专用绘图装饰器, 对方法运行结果进行绘图
+        Analysis类专用绘图装饰器, 接收方法分析处理结果进行绘图
 
-        若 .isPlot=False, 则直接返回被装饰方法的结果
-
-        若 .isPlot=True, 则调用 PlotFunc 进行绘图, 且不返回结果
+        该装饰器通过Analysis.isPlot属性控制是否执行绘图操作
 
         Parameters
         ----------
@@ -81,18 +86,19 @@ class BaseAnalysis:
             装饰器函数
         """
 
-        def decorator(func):
-            def wrapper(self, *args, **kwargs):
+        def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
+            @wraps(func)
+            def wrapper(self, *args: _P.args, **kwargs: _P.kwargs) -> _R:
                 plot_args = func(self, *args, **kwargs)
                 if not self.isPlot:
-                    return plot_args  # 不进行绘图, 直接返回结果
-                # 需确保被装饰函数返回值格式与PlotFunc输入参数格式一致
+                    return plot_args
+                # 返回值格式与PlotFunc输入格式需一致
                 if isinstance(plot_args, tuple):
                     PlotFunc(*plot_args, **self.plot_kwargs)
                 else:
                     PlotFunc(plot_args, **self.plot_kwargs)
-                return None  # 绘图则不返回结果
+                return plot_args
 
-            return wrapper
+            return wrapper  # ty:ignore[invalid-return-type]
 
         return decorator
