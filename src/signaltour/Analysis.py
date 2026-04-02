@@ -5,18 +5,21 @@
 
 ## 可用的接口
 
-### core: Analysis子包核心模块, 提供各种信号分析处理方法的基类接口
+### core: Analysis子包核心模块, 实现了信号分析处理方法的基础类与通用函数
     - class:
-        - `BaseAnalysis`: 通用信号分析处理方法类
+        - `BaseAnalysis`: 通用信号分析处理方法基类
 ### StatsTrendAnalysis: 时域统计分析模块, 提供时域统计趋势等方法
     - class:
         - `StatsTrendAnalysis`: 信号时域统计分析类
 ### SpectrumAnalysis: 平稳信号谱分析模块, 提供多种基于DFT的频谱分析方法
     - function:
-        - `window`: 生成各类窗函数的整周期采样序列
-        - `find_spectralines`: 对序列数据进行谱线类局部峰值检测
+        - `get_window`: 生成指定窗函数的整周期采样序列
+        - `find_spectralines`: 检测谱数据中的谱线类局部峰值
+        - `convolveCycle`: 计算两个序列数据的循环卷积, 该卷积方式满足DFT的卷积定理
+        - `convolve`: 计算两个序列数据的线性卷积
     - class:
-        - `SpectrumAnalysis`: 平稳信号频谱分析方法
+        - `Spectrum`: 平稳信号频谱分析方法类
+        - `Hilbert`: 单成分调制信号希尔伯特分析方法类
 ### TimeFreqAnalysis: 非平稳信号时频分析模块, 提供多种时频谱图计算方法
     - class:
         - `STFTAnalysis`: 短时傅里叶变换 (Short-Time Fourier Transform, STFT) 分析类
@@ -36,7 +39,6 @@
         - `EMDAnalysis`: 经验模态分解(EMD), 对输入的一维信号执行分解, 提供 IMF 提取、筛选过程可视化与结果绘制等功能。
         - `VMDAnalysis`: 变分模态分解(VMD)类, 通过频域交替优化将信号分解为若干具有有限带宽的本征模态
 """
-
 # ruff: noqa: F403
 # ruff: noqa: I001
 

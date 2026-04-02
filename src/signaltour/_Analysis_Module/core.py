@@ -6,7 +6,7 @@
 ## 可用的接口
 
     - class:
-        - `BaseAnalysis`: 通用信号分析处理方法类
+        - `BaseAnalysis`: 通用信号分析处理方法基类
 """
 
 __all__ = ["BaseAnalysis"]

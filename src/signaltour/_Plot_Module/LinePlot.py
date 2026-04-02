@@ -223,7 +223,7 @@ class LinePlot(BasePlot):
         if isFindPeaks:
             task_plugins.append(
                 PeakfinderPlugin(
-                    threshold=task_kwargs.get("plugin_threshold") or 0.85,
+                    threshold=task_kwargs.get("plugin_threshold") or 0.8,
                     distance=task_kwargs.get("plugin_distance") or 0.01,
                 )
             )
