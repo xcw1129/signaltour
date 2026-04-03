@@ -170,7 +170,7 @@ class Files:
             logger.warning(f"Files初始化异常: root={rootpath}, reason=无有效数据文件")
         # 处理表格数据并记录元数据属性
         self._fileTable["size[MB]"] = self._fileTable["size[MB]"] / (1024 * 1024)  # 转换为MB单位
-        self._fileTable["modifiedTime"] = pd.to_datetime(self._fileTable["modifiedTime"], unit="s").round("s")
+        self._fileTable["modifiedTime"] = pd.to_datetime(self._fileTable["modifiedTime"], unit="s").dt.round("s")
         self._fileTable.attrs["rootpath"] = rootpath
         self._fileTable.attrs["filetype"] = filetype
         # 进行最终注册表验证
