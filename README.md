@@ -1,12 +1,10 @@
 # signaltour
 
-一个用于一维时间序列振荡数据分析的 Python 信号处理库。
+面向一维快变振荡时间序列数据的信号分析, 处理库
 
 ## 概述
 
-signaltour 为信号加载、预处理、分析和可视化提供了面向对象的工作流程。它通过模块化、可扩展的架构，为处理一维时域信号提供了全面的工具集。
-
-## 特性
+signaltour 为信号加载、预处理、分析和可视化提供了面向对象的工作流程。通过模块化、可扩展的架构，为处理一维时域信号提供了全面的工具集
 
 - **信号管理**：加载、生成和操作时间序列数据，自动处理元数据（采样频率、持续时间、单位）
 - **频谱分析**：基于 FFT 的频域分析，支持可配置的窗函数和缩放方式
@@ -24,15 +22,7 @@ signaltour 为信号加载、预处理、分析和可视化提供了面向对象
 pip install signaltour
 ```
 
-### 从源码安装
-
-```bash
-git clone https://github.com/xcw1129/signaltour.git
-cd signaltour
-pip install -e .
-```
-
-## 依赖要求
+### 依赖要求
 
 - Python ≥ 3.11
 - numpy ≥ 2.0.0
@@ -43,6 +33,8 @@ pip install -e .
 - pyarrow ≥ 22.0.0
 
 ## 快速入门
+
+### 基本使用示例
 
 ```python
 from signaltour import Signal, Analysis, Plot
@@ -56,7 +48,7 @@ sig = Signal.periodic(
 )
 
 # 执行频谱分析
-analyzer = Analysis.SpectrumAnalysis(sig, isPlot=True)
+analyzer = Analysis.Spectrum(sig, isPlot=True)
 spectrum = analyzer.ft()  # 傅里叶变换
 
 # 创建自定义可视化
@@ -65,11 +57,14 @@ plot.waveform(sig)
 plot.show()
 ```
 
-## 架构设计
+### 架构设计
 
 signaltour 采用三层模块化设计：
 
-### Signal 模块（信号模块）
+
+#### 1. Signal 模块
+
+
 提供信号表示、文件读写、仿真生成、采样处理和滤波的核心数据结构。
 
 ```python
@@ -97,7 +92,8 @@ filtered = Signal.filtIIR(sig, cutoff=100, order=4, btype='low', ftype='butter')
 resampled = Signal.resample(sig, new_fs=500)
 ```
 
-### Analysis 模块（分析模块）
+#### 2. Analysis 模块
+
 为信号分析算法提供标准化框架，支持可选的可视化输出。
 
 ```python
@@ -122,7 +118,8 @@ stft_analysis = Analysis.STFTAnalysis(sig, isPlot=True)
 t_axis, f_axis, tfr = stft_analysis.stft(segNum=256)  # 短时傅里叶变换
 ```
 
-### Plot 模块（绘图模块）
+#### 3. Plot 模块
+
 基于任务队列的绘图引擎，提供链式 API 和插件支持。
 
 ```python
@@ -160,14 +157,16 @@ plot.add_plugin_to_task(Plot.PeakfinderPlugin(threshold=0.8))  # 峰值查找插
 plot.show()
 ```
 
-## 许可证
+## 其它
+
+### 许可证
 
 Apache License 2.0
 
 详见 [LICENSE](LICENSE) 文件。
 
-## 联系方式
+### 联系方式
 
-- 作者：Xiong Chengwen
+- 作者：Xiong Chengwen/熊成文
 - 邮箱：xiongcw1129@gmail.com
 - GitHub：[https://github.com/xcw1129/signaltour](https://github.com/xcw1129/signaltour)
