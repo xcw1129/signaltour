@@ -12,7 +12,7 @@
         波形图、一维/二维谱图和测试统计图等绘图可视化子包
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 from . import Signal, Analysis, Plot  # noqa: I001
 
