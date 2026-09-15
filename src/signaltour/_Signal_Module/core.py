@@ -55,13 +55,13 @@ class Axis:
         坐标轴范围: (min, max)
     L : float
         坐标轴分布长度
-    label : str
-        坐标轴标签: "name[unit]"
 
     Methods
     -------
     copy() -> Self
-        返回拷贝副本
+        返回拷贝对象, 与原对象完全独立
+    to_pos_index(key) -> int | slice | None
+        将物理索引转换为位置索引
     """
 
     def __init__(self, N: int, dx: float, x0: float = 0.0, name: str = "", unit: str = "") -> None:
@@ -79,7 +79,7 @@ class Axis:
         name : str, optional
             坐标轴名称
         unit : str, optional
-            坐标轴单位, 推荐使用标准单位或领域内通用单位
+            坐标轴单位, 推荐使用标准单位或领域内通用单位. 支持$符号包裹的LaTeX语法, 以便绘图显示
         """
         # Axis类核心维护参数
         self.N: int = N
@@ -103,12 +103,7 @@ class Axis:
     @property
     def L(self) -> float:
         """坐标轴分布长度"""
-        return self.lim[1] - self.lim[0]  # 坐标轴分布长度
-
-    @property
-    def label(self) -> str:
-        """坐标轴标签： name[unit]"""
-        return f"{self.name}[{self.unit}]" if self.unit else self.name
+        return self.N * self._dx  # N*dx
 
     # --------------------------------------------------------------------------------#
     # 数组特性支持
@@ -119,43 +114,19 @@ class Axis:
         return iter(self.data)
 
     def __contains__(self, item: float) -> bool:
-        """利用坐标轴顺序均匀采样特性, 判断坐标是否在坐标轴上, 避免遍历数组"""
-        # 计算理论索引
+        # 利用坐标轴顺序均匀采样特性, 判断坐标是否在坐标轴上, 避免遍历数组
         idx = (item - self._x0) / self._dx
-        idx_round = round(idx)
+        idx_round = round(idx)  # 取整数索引
         # 检查是否接近整数且在范围内
-        rel_error = abs(idx - idx_round)
-        return rel_error < 1e-9 and 0 <= idx_round < self.N
-
-    def _to_real_index(self, key) -> int | slice | None:
-        """将索引键中的物理坐标转换为逻辑索引"""
-        if isinstance(key, slice):
-            return slice(
-                self._to_real_index(key.start),
-                self._to_real_index(key.stop),
-                key.step,  # step参数不支持物理坐标转换
-            )  # 递归分别转换
-        # 仅对字符串类型进行物理坐标解析
-        if isinstance(key, str):
-            pattern = r"^([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)" + re.escape(self.unit) + r"$"
-            match = re.fullmatch(pattern, key)
-            if not match:
-                raise IndexError(f"slice={key}: 物理坐标解析失败")
-            val = float(match.group(1))
-            # 转换为逻辑索引, 支持非整数索引
-            idx = (val - self._x0) / self._dx
-            idx = int(np.ceil(idx - 1e-9))
-            idx = max(0, min(self.N, idx))  # 限制在有效范围内
-            return idx
-        # int, None 等其他类型原样返回，由 numpy 处理逻辑索引
-        return key
+        is_contained = abs(idx - idx_round) < 1e-3 and 0 <= idx_round < self.N  # 确保误差只占采样间隔的0.1%
+        return is_contained
 
     def __getitem__(self, index):
-        # 1. 统一转换物理/逻辑索引为纯逻辑索引
-        real_idx = self._to_real_index(index)
-        # 2. 处理顺序间隔索引以保持类型
-        if isinstance(real_idx, slice):
-            start, stop, step = real_idx.indices(self.N)
+        # 统一转换物理/位置索引为纯位置索引
+        pos_idx = self.to_pos_index(index)
+        # 处理顺序间隔索引以保持类型
+        if isinstance(pos_idx, slice):
+            start, stop, step = pos_idx.indices(self.N)
             if step > 0:
                 new_axis = self.copy()
                 # 调整核心参数
@@ -163,13 +134,13 @@ class Axis:
                 new_axis._dx = self._dx * step
                 new_axis._x0 = self._x0 + start * self._dx
                 return new_axis
-        # 3. 其它情况直接返回array
-        return self.data[real_idx]
+        # 其它情况直接返回array
+        return self.data[pos_idx]
 
     # --------------------------------------------------------------------------------#
     # Python操作兼容
     def __call__(self):
-        """返回坐标轴数组"""
+        # 返回坐标轴数组
         return self.data  # Axis()返回.data属性，方便直接调用
 
     def __eq__(self, other) -> bool:
@@ -180,14 +151,16 @@ class Axis:
                 and np.isclose(self._x0, other._x0)
                 and self.unit == other.unit
             )
-        return False  # 与非Axis类型比较均返回False
+        if isinstance(other, np.ndarray):
+            return np.allclose(self.data, other)
+        return False
 
     def __str__(self):
-        """面向运行时"""
-        return f"{type(self).__name__}({self.name}={self.data}[{self.unit}])"
+        # 面向运行时
+        return f"{type(self).__name__}({self.name}={self.data}{self.unit})"
 
     def __repr__(self):
-        """面向开发时"""
+        # 面向开发时
         return (
             f"{type(self).__name__}(N={self.N}, dx={self._dx}, x0={self._x0}, name='{self.name}', unit='{self.unit}')"  # noqa: E501
         )
@@ -195,23 +168,43 @@ class Axis:
     # --------------------------------------------------------------------------------#
     # numpy兼容
     def __array__(self, dtype=None, copy=None) -> np.ndarray:
-        if copy is False:
-            raise ValueError("copy=False: Axis类不支持返回数据视图")
         return self.data.astype(dtype, copy=False)
 
     # --------------------------------------------------------------------------------#
     # 外部用户方法
     def copy(self) -> Self:
-        """返回拷贝副本"""
-        return deepcopy(self)  # 确保嵌套可变属性独立
+        """返回拷贝对象, 与原对象完全独立"""
+        return deepcopy(self)  # 确保子类可直接继承使用
+
+    def to_pos_index(self, key) -> int | slice | None:
+        """将物理索引转换为位置索引"""
+        if isinstance(key, slice):
+            return slice(
+                self.to_pos_index(key.start),
+                self.to_pos_index(key.stop),
+                key.step,  # step参数不支持物理坐标转换
+            )  # 递归分别转换
+        # 仅对字符串类型进行物理索引解析
+        if isinstance(key, str):
+            pattern = r"([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s*" + re.escape(self.unit)
+            match = re.fullmatch(pattern, key)
+            if not match:
+                raise IndexError(f"index={key}: 物理索引解析失败. 请使用'value unit'格式的物理索引")
+            val = float(match.group(1))
+            # 转换为位置索引, 支持非对齐索引
+            idx = (val - self._x0) / self._dx
+            idx = int(np.ceil(idx - 1e-3))
+            return idx  # 由numpy处理索引越界
+        # int, None 等其他类型原样返回，由 numpy 处理逻辑索引
+        return key
 
 
 # --------------------------------------------------------------------------------------------#
 class Series(NDArrayOperatorsMixin):
     """
-    通用一维序列数据类, 用于保存和管理坐标轴和对应序列数据
+    通用序列数据类, 用于保存和管理以一维序列数据及其坐标轴
 
-    Series类及其子类均支持各种算术和比较符操作, 以及NumPy函数输入, 并尽可能保持类型
+    Series类及其子类均支持各种运算符操作, 以及NumPy函数兼容, 并尽可能保持类型
 
     Attributes
     ----------
@@ -220,11 +213,11 @@ class Series(NDArrayOperatorsMixin):
     data : np.ndarray
         序列数据数组
     name : str
-        序列名称
+        序列数据名称
     unit : str
-        序列单位
+        序列数据单位
     label : str
-        序列标签
+        序列数据标签
 
     Methods
     -------
@@ -247,7 +240,7 @@ class Series(NDArrayOperatorsMixin):
         label: str = "",
     ):
         """
-        通用一维序列数据类, 用于保存和管理坐标轴和对应序列数据
+        通用序列数据类, 用于保存和管理以一维序列数据及其坐标轴
 
         Parameters
         ----------
@@ -256,11 +249,11 @@ class Series(NDArrayOperatorsMixin):
         data : np.ndarray, optional
             序列数据数组
         name : str, optional
-            序列名称
+            序列数据名称
         unit : str, optional
-            序列单位
+            序列数据单位
         label : str, optional
-            序列标签
+            序列数据标签
         """
         # Series类核心维护参数
         self._axis: Axis = axis.copy()  # _axis优先级高于_data
@@ -294,18 +287,17 @@ class Series(NDArrayOperatorsMixin):
     def data(self, value: np.ndarray):
         # 支持整体替换数据, 但需合法
         if self._check_data(value) is False:
-            raise ValueError(f"data={value}: 输入序列数据数组非法")
-        if self._COPY_DATA_WHEN_INIT:
-            self._data = np.array(value, copy=True)
-        else:
-            self._data = np.asarray(value, copy=False).view()
+            raise ValueError(
+                f"data={value}: 输入序列数据数组非法. 避免使用不可写数组, 非一维数组, 长度不匹配或包含NaN值"
+            )
+        self._data = np.asarray(value, copy=self._COPY_DATA_WHEN_INIT)
 
     # --------------------------------------------------------------------------------#
     # 数据检查和转换
     def _check_data(self, data):
         arr = np.asarray(data)
         if arr.flags.writeable is False:
-            raise ValueError("输入序列数据数组不可写, 无法作为数据源")
+            return False
         if arr.ndim != 1 or len(arr) != len(self._axis):
             return False
         if np.any(np.isnan(arr)):
@@ -337,7 +329,7 @@ class Series(NDArrayOperatorsMixin):
     # 数组特性支持
     def __getitem__(self, index):
         # 1. 统一转换物理/逻辑索引为纯逻辑索引
-        real_idx = self._axis._to_real_index(index)
+        real_idx = self._axis.to_pos_index(index)
         # 2. 对坐标轴进行索引/切片
         new_axis = self._axis[index]
         if isinstance(new_axis, Axis):
