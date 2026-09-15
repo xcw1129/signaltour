@@ -43,7 +43,7 @@ from ._Signal_Module.core import *
 from ._Signal_Module.SignalRead import *
 from ._Signal_Module.SignalSimulate import *
 from ._Signal_Module.SignalSample import *
-from ._Signal_Module.SignalFilt import *
+from ._Signal_Module.SignalFilter import *
 
 if __name__ == "__main__":
     from script.docstring import update_package_docstring

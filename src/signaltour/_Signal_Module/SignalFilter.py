@@ -1,5 +1,5 @@
 """
-# SignalFilt
+# SignalFilter
 
 ---
 
