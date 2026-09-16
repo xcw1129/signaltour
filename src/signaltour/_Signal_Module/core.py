@@ -765,9 +765,9 @@ class Signal(Series):
     # 外部用户方法
     def to_Spectra(self) -> "Spectra":
         """转换信号到其频谱"""
-        from .._Analysis_Module.SpectrumAnalysis import Spectrum
+        from .._Analysis_Module.SpectrumAnalysis import SpectrumAnalysis
 
-        spc = Spectrum(self).cft(winType="矩形窗", padTimes=0)  # 保持原始长度, 不延拓
+        spc = SpectrumAnalysis(self).cft(winType="矩形窗", padTimes=0)  # 保持原始长度, 不延拓
         return spc
 
 

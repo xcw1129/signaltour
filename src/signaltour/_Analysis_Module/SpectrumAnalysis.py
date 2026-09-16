@@ -16,8 +16,8 @@ __all__ = [
     "find_spectralines",
     "convolveCycle",
     "convolve",
-    "Spectrum",
-    "Hilbert",
+    "SpectrumAnalysis",
+    "HilbertAnalysis",
 ]
 
 from .._Assist_Module.Dependencies import Callable, Optional, fft, linalg, np, signal
@@ -196,11 +196,11 @@ def convolveCycle(x: np.ndarray, y: np.ndarray, method="fft") -> np.ndarray:
         raise ValueError(f"输入序列长度错误. 循环卷积要求输入序列长度相等. 当前len(x)={len(x)}, len(y)={len(y)}")
     if method == "fft":
         # 通过频域乘计算循环卷积
-        X_f = Spectrum.dft(x)
-        Y_f = Spectrum.dft(y)
+        X_f = SpectrumAnalysis.dft(x)
+        Y_f = SpectrumAnalysis.dft(y)
         Z_f = X_f * Y_f
         # 还原时域得卷积结果
-        z_n = Spectrum.idft(Z_f).real
+        z_n = SpectrumAnalysis.idft(Z_f).real
         return z_n
     elif method == "direct":
         # 直接计算循环卷积
@@ -275,7 +275,7 @@ def convolve(x: np.ndarray, y: np.ndarray, mode: str = "full") -> np.ndarray:
 
 
 # --------------------------------------------------------------------------------------------#
-class Spectrum(BaseAnalysis):
+class SpectrumAnalysis(BaseAnalysis):
     """
     平稳信号频谱分析方法类
 
@@ -410,7 +410,7 @@ class Spectrum(BaseAnalysis):
             傅里叶变换谱
         """
         # 计算傅里叶变换: FT=DFT*Δt
-        X_f = Spectrum.dft(self.Sig.data) * self.Sig.t_axis.dt
+        X_f = SpectrumAnalysis.dft(self.Sig.data) * self.Sig.t_axis.dt
         # 构造频谱对象
         Spc = Spectra(
             axis=self.Sig.t_axis.to_f_axis(),
@@ -447,7 +447,7 @@ class Spectrum(BaseAnalysis):
         scale = 1 / np.mean(win)  # 幅值补偿因子
         # 计算傅里叶级数系数: CFT=DFT/N
         data_pad = np.pad(self.Sig.data, padTimes * len(self.Sig) // 2, mode="constant")
-        X_k = Spectrum.dft(data_pad * win) / len(data_pad)
+        X_k = SpectrumAnalysis.dft(data_pad * win) / len(data_pad)
         X_k = X_k * scale  # 幅值补偿
         # 构造频谱对象
         Spc = Spectra(
@@ -533,8 +533,8 @@ class Spectrum(BaseAnalysis):
             - "log": 对数差分 (dB), 10 * log10(Spc2 / Spc1)
         """
         # 计算两个信号的功率谱
-        Spc1 = Spectrum(self.Sig).psd(averageTimes=averageTimes)
-        Spc2 = Spectrum(Sig_ref).psd(averageTimes=averageTimes)
+        Spc1 = SpectrumAnalysis(self.Sig).psd(averageTimes=averageTimes)
+        Spc2 = SpectrumAnalysis(Sig_ref).psd(averageTimes=averageTimes)
 
         if mode == "absolute":
             Spc_diff = Spc2 - Spc1
@@ -556,7 +556,7 @@ class Spectrum(BaseAnalysis):
 
 
 # --------------------------------------------------------------------------------------------#
-class Hilbert(BaseAnalysis):
+class HilbertAnalysis(BaseAnalysis):
     """
     单成分调制信号希尔伯特分析方法类
 
@@ -647,6 +647,6 @@ class Hilbert(BaseAnalysis):
     def envelopeSpectrum(self) -> Spectra:
         """计算包络幅值谱"""
         Sig_amplitude: Signal = self.amplitude()
-        Spc_envelope: Spectra = Spectrum(Sig_amplitude).cft(padTimes=3)
+        Spc_envelope: Spectra = SpectrumAnalysis(Sig_amplitude).cft(padTimes=3)
         Spc_envelope.name = "包络幅值"
         return Spc_envelope
