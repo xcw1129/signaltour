@@ -76,7 +76,7 @@ class STFTAnalysis(BaseAnalysis):
             # df_seg/df=(segNum-1)/2
             if df is not None:
                 df /= 3  # 考虑到谱泄露, 适当提高频率分辨率要求
-                segNum_max = int((df / self.Sig.f_axis.df) * 2 + 1)
+                segNum_max = int((df / self.Sig.t_axis.to_f_axis().df) * 2 + 1)
                 segNum = segNum_max
             # dt_seg/dt=2N/(segNum-1)
             if dt is not None:
@@ -233,5 +233,5 @@ class WVDAnalysis(BaseAnalysis):
         # 沿时延轴FFT
         Wf = (fft.fft(Wf, axis=0).real / N).T  # 对0维(时延轴)做FFT, 转置后0维为时间轴, 1维为频率轴
         time = self.Sig.t_axis()[::nhop]
-        freq = np.arange(N) * (self.Sig.f_axis.df / 2)
+        freq = np.arange(N) * (self.Sig.t_axis.to_f_axis().df / 2)
         return time, freq, Wf

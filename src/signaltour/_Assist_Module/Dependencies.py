@@ -31,6 +31,7 @@ from importlib import resources  # 资源管理
 from importlib import util  # 模块导入工具
 from time import time  # 时间计时
 import random  # 随机操作
+import numbers  # 数字操作
 
 # 向量数值计算库
 import numpy as np

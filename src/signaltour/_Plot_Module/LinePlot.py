@@ -164,7 +164,7 @@ class LinePlot(BasePlot):
             SigList = Sig
         # 绘图任务kwargs优先级: 用户传入kwargs > 全局kwargs > 方法默认设置
         task_kwargs = {
-            "xlabel": SigList[0]._axis.label,
+            "xlabel": SigList[0]._axis.name + (f"[{SigList[0]._axis.unit}]" if SigList[0]._axis.unit else ""),
             "xlim": SigList[0]._axis.lim,
             "ylabel": (f"{SigList[0].name}" + f"[{SigList[0].unit}]" if SigList[0].unit else ""),
             "title": f"{SigList[0].label}波形图",
@@ -208,7 +208,7 @@ class LinePlot(BasePlot):
         # 绘制设置
         # 绘图任务kwargs优先级: 用户传入kwargs > 全局kwargs > 方法默认设置
         task_kwargs = {
-            "xlabel": Spc.f_axis.label,
+            "xlabel": Spc.f_axis.name + (f"[{Spc.f_axis.unit}]" if Spc.f_axis.unit else ""),
             "xlim": Spc.f_axis.lim,
             "ylabel": f"{Spc.name}" + f"[{Spc.unit}]" if Spc.unit else "",
             "title": f"{Spc.label}{Spc.name}谱",
@@ -277,7 +277,7 @@ class LinePlot(BasePlot):
         # 绘制设置
         # 绘图任务kwargs优先级: 用户传入kwargs > 全局kwargs > 方法默认设置
         task_kwargs = {
-            "xlabel": trends[0]._axis.label,
+            "xlabel": trends[0]._axis.name + (f"[{trends[0]._axis.unit}]" if trends[0]._axis.unit else ""),
             "ylabel": (f"{trends[0].name}" + f"[{trends[0].unit}]" if trends[0].unit else ""),
             "title": trends[0].name + "趋势对比图",
         }  # 方法默认设置

@@ -102,9 +102,9 @@
 
 __version__ = "1.2.0"
 
-from .Signal import *  # noqa: F403, I001
-from .Plot import *  # noqa: F403
-from .Analysis import *  # noqa: F403
+from ._Signal import *  # noqa: F403, I001
+from ._Plot import *  # noqa: F403
+from ._Analysis import *  # noqa: F403
 
 if __name__ == "__main__":
     from script.docstring import update_init_docstring

@@ -413,7 +413,7 @@ class Spectrum(BaseAnalysis):
         X_f = Spectrum.dft(self.Sig.data) * self.Sig.t_axis.dt
         # 构造频谱对象
         Spc = Spectra(
-            axis=self.Sig.f_axis,
+            axis=self.Sig.t_axis.to_f_axis(),
             data=X_f,
             name="幅值密度",
             unit=self.Sig.unit + "/Hz",
@@ -451,7 +451,7 @@ class Spectrum(BaseAnalysis):
         X_k = X_k * scale  # 幅值补偿
         # 构造频谱对象
         Spc = Spectra(
-            axis=f_Axis(len(X_k), df=self.Sig.f_axis.df / (1 + padTimes)),
+            axis=f_Axis(len(X_k), df=self.Sig.t_axis.to_f_axis().df / (1 + padTimes)),
             data=X_k,
             name="幅值",
             unit=self.Sig.unit,

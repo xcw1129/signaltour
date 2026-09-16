@@ -269,13 +269,13 @@ class CWTAnalysis(BaseAnalysis):
             时间轴, 频率轴, CWT谱矩阵
         """
         # 生成离散尺度轴
-        flow = 10 * self.Sig.f_axis.df if flow is None else flow
+        flow = 10 * self.Sig.t_axis.to_f_axis().df if flow is None else flow
         fhigh = self.Sig.t_axis.fs / 2 if fhigh is None else fhigh
         ratio = fhigh / flow
         j = int(np.log2(ratio)) + 1
         scale = CWTAnalysis.get_scale(b=2, j=j, v=nperoctave)  # s<=1
         # 生成基小波的离散尺度采样序列
-        param.update({"fc": flow / self.Sig.f_axis.df})  # 归一化频率
+        param.update({"fc": flow / self.Sig.t_axis.to_f_axis().df})  # 归一化频率
         wavelets = CWTAnalysis.get_wavelets_discrete(
             type=wavelet,
             param=param,
