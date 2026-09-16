@@ -1,43 +1,39 @@
 """
 # Analysis: 统计分析、谱分析、非平稳时频分析等信号分析子包
 
----
-
-## 可用的接口
-
-### core: Analysis子包核心模块, 实现了信号分析处理方法的基础类与通用函数
+## core: Analysis子包核心模块, 实现了信号分析处理方法的基础类与通用函数
     - class:
         - `BaseAnalysis`: 通用信号分析处理方法基类
-### StatsTrendAnalysis: 时域统计分析模块, 提供时域统计趋势等方法
+## StatsTrendAnalysis: 时域统计分析模块, 提供时域统计趋势等方法
     - class:
         - `StatsTrendAnalysis`: 信号时域统计分析类
-### SpectrumAnalysis: 平稳信号谱分析模块, 提供多种基于DFT的频谱分析方法
+## SpectrumAnalysis: 平稳信号谱分析模块, 提供多种基于DFT的频谱分析方法
+    - class:
+        - `Spectrum`: 平稳信号频谱分析方法类
+        - `Hilbert`: 单成分调制信号希尔伯特分析方法类
     - function:
         - `get_window`: 生成指定窗函数的整周期采样序列
         - `find_spectralines`: 检测谱数据中的谱线类局部峰值
         - `convolveCycle`: 计算两个序列数据的循环卷积, 该卷积方式满足DFT的卷积定理
         - `convolve`: 计算两个序列数据的线性卷积
-    - class:
-        - `Spectrum`: 平稳信号频谱分析方法类
-        - `Hilbert`: 单成分调制信号希尔伯特分析方法类
-### TimeFreqAnalysis: 非平稳信号时频分析模块, 提供多种时频谱图计算方法
+## TimeFreqAnalysis: 非平稳信号时频分析模块, 提供多种时频谱图计算方法
     - class:
         - `STFTAnalysis`: 短时傅里叶变换 (Short-Time Fourier Transform, STFT) 分析类
         - `WVDAnalysis`: 魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类
-### WaveletAnalysis:小波分析模块, 提供连续小波、离散小波等多种小波多分辨率分析方法
+## WaveletAnalysis:小波分析模块, 提供连续小波、离散小波等多种小波多分辨率分析方法
     - class:
         - `CWTAnalysis`: 连续小波变换 (Continuous Wavelet Transform, CWT) 分析类
         - `DWTAnalysis`: 离散小波变换 (Discrete Wavelet Transform, DWT) 分析类
-### ModeAnalysis: 非平稳多分量信号模态分解模块, 提供多种分解算法(如EMD, VMD)的实现与辅助函数
+## ModeAnalysis: 非平稳多分量信号模态分解模块, 提供多种分解算法(如EMD, VMD)的实现与辅助函数
+    - class:
+        - `EMDAnalysis`: 经验模态分解(EMD), 对输入的一维信号执行分解, 提供 IMF 提取、筛选过程可视化与结果绘制等功能。
+        - `VMDAnalysis`: 变分模态分解(VMD)类, 通过频域交替优化将信号分解为若干具有有限带宽的本征模态
     - function:
         - `siftProcess_PlotFunc`: 绘制单次筛选过程的辅助图像
         - `updateProcess_PlotFunc`: 绘制 VMD 迭代更新过程的辅助图像
         - `search_localExtrema`: 搜索序列中的局部极大与极小值索引, 并基于阈值剔除弱极值点
         - `get_spectraCenter`: 计算频谱的功率加权中心频率
         - `get_Trend`: 提取信号的趋势模态
-    - class:
-        - `EMDAnalysis`: 经验模态分解(EMD), 对输入的一维信号执行分解, 提供 IMF 提取、筛选过程可视化与结果绘制等功能。
-        - `VMDAnalysis`: 变分模态分解(VMD)类, 通过频域交替优化将信号分解为若干具有有限带宽的本征模态
 """
 # ruff: noqa: F403
 # ruff: noqa: I001

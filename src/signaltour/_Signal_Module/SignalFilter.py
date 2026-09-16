@@ -1,9 +1,5 @@
 """
-# SignalFilter
-
----
-
-## 可用的接口
+# SignalFilter: 信号滤波模块, 提供FIR/IIR滤波器与中值滤波等去噪方法
 
     - function:
         - `filtFIR`: 基于有限冲击响应滤波器对信号进行各种类型滤波

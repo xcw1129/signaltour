@@ -1,10 +1,6 @@
 """
 # WaveletAnalysis:小波分析模块, 提供连续小波、离散小波等多种小波多分辨率分析方法
 
----
-
-## 可用的接口
-
     - class:
         - `CWTAnalysis`: 连续小波变换 (Continuous Wavelet Transform, CWT) 分析类
         - `DWTAnalysis`: 离散小波变换 (Discrete Wavelet Transform, DWT) 分析类

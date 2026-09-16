@@ -1,16 +1,12 @@
 """
-# LinePlot
+# LinePlot: 一维线条图模块, 提供波形图、频谱图与分解结果总览图等绘制方法
 
----
-
-## 可用的接口
-
+    - class:
+        - `LinePlot`: 波形图、谱图等一维线条图绘制绘图类
     - function:
         - `PlotFunc_waveform`: 信号波形图绘制函数
         - `PlotFunc_spectrum`: 频谱绘制函数
         - `PlotFunc_decResult`: 信号分解结果总览图绘制函数
-    - class:
-        - `LinePlot`: 波形图、谱图等一维线条图绘制绘图类
 """
 
 __all__ = [

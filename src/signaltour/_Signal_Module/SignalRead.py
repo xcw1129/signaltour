@@ -1,16 +1,12 @@
 """
-# SignalRead
+# SignalRead: 数据读取模块, 提供数据文件批量管理、文件夹预览与数据集扫描加载等方法
 
----
-
-## 可用的接口
-
-    - function:
-        - `set_logging_level`: 设置当前模块的日志显示级别
     - class:
         - `Files`: 数据文件批量管理类, 支持单一目录下指定类型数据文件的快速筛选与批量加载
         - `Folder`: 数据文件夹管理类, 支持快速预览和批量检索、筛选和加载数据文件
         - `Dataset`: 数据集扫描与管理类, 支持自动识别层级结构并发现、加载数据文件, 支持嵌套键索引
+    - function:
+        - `set_logging_level`: 设置当前模块的日志显示级别
 """
 
 __all__ = ["set_logging_level", "Files", "Folder", "Dataset"]

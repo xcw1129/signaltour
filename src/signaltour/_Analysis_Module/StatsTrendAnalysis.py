@@ -1,10 +1,6 @@
 """
 # StatsTrendAnalysis: 时域统计分析模块, 提供时域统计趋势等方法
 
----
-
-## 可用的接口
-
     - class:
         - `StatsTrendAnalysis`: 信号时域统计分析类
 """

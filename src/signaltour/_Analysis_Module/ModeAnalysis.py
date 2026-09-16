@@ -1,19 +1,15 @@
 """
 # ModeAnalysis: 非平稳多分量信号模态分解模块, 提供多种分解算法(如EMD, VMD)的实现与辅助函数
 
----
-
-## 可用的接口
-
+    - class:
+        - `EMDAnalysis`: 经验模态分解(EMD), 对输入的一维信号执行分解, 提供 IMF 提取、筛选过程可视化与结果绘制等功能。
+        - `VMDAnalysis`: 变分模态分解(VMD)类, 通过频域交替优化将信号分解为若干具有有限带宽的本征模态
     - function:
         - `siftProcess_PlotFunc`: 绘制单次筛选过程的辅助图像
         - `updateProcess_PlotFunc`: 绘制 VMD 迭代更新过程的辅助图像
         - `search_localExtrema`: 搜索序列中的局部极大与极小值索引, 并基于阈值剔除弱极值点
         - `get_spectraCenter`: 计算频谱的功率加权中心频率
         - `get_Trend`: 提取信号的趋势模态
-    - class:
-        - `EMDAnalysis`: 经验模态分解(EMD), 对输入的一维信号执行分解, 提供 IMF 提取、筛选过程可视化与结果绘制等功能。
-        - `VMDAnalysis`: 变分模态分解(VMD)类, 通过频域交替优化将信号分解为若干具有有限带宽的本征模态
 """
 
 __all__ = [

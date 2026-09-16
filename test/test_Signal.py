@@ -28,7 +28,7 @@ with app.setup(hide_code=True):
 
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    from signaltour import Signal
+    import signaltour as st
 
 
 @app.cell(hide_code=True)
@@ -159,8 +159,8 @@ def _():
 @app.function
 def test_Axis():
     # 创建实例
-    axis = Signal.Axis(N=10, dx=1, x0=0, name="位移", unit="mm")
-    assert isinstance(axis, Signal.Axis)
+    axis = st.Axis(N=10, dx=1, x0=0, name="位移", unit="mm")
+    assert isinstance(axis, st.Axis)
     # 测试属性
     np.testing.assert_allclose(
         axis.data, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -175,15 +175,19 @@ def test_Axis():
     np.testing.assert_allclose(
         list(axis), np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     )
+    np.testing.assert_allclose(
+        [a for a in axis], np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    )
     # 测试相等判断
-    assert axis == Signal.Axis(N=10, dx=1, x0=0, unit="mm")
-    assert axis != Signal.Axis(N=10, dx=1, x0=0, unit="cm")
-    assert axis != Signal.Axis(N=10, dx=2, x0=0, unit="mm")
+    assert axis == st.Axis(N=10, dx=1, x0=0, unit="mm")
+    assert axis != st.Axis(N=10, dx=1, x0=0, unit="cm")
+    assert axis != st.Axis(N=10, dx=2, x0=0, unit="mm")
     assert axis == axis.data
     # 测试坐标索引
-    axis = Signal.Axis(N=10, dx=0.1, x0=2, name="位移", unit="mm")
+    axis = st.Axis(N=10, dx=0.1, x0=2, name="位移", unit="mm")
     assert axis[2] == 2.2
     assert isinstance(axis[1:6:2], type(axis))
+    assert isinstance(axis[[1, 3]], np.ndarray)
     assert axis["2.3mm"] == 2.3
     assert axis["2.32mm"] == 2.4
     np.testing.assert_allclose(
@@ -206,7 +210,7 @@ def _():
 
 
 @app.cell
-def _(IS_Like_array):
+def _(IS_Like_array, Signal):
     def test_Series():
         # 创建实例
         data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -274,22 +278,25 @@ def _():
     return
 
 
-@app.function
-def test_Signal():
-    # 创建实例
-    data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-    axis = Signal.t_Axis(len(data), fs=10)
-    Signal.Signal._COPY_DATA_WHEN_INIT = False
-    signal = Signal.Signal(
-        data=data, axis=axis, name="振动", unit="$m/s^2$", label="测点信号"
-    )
-    assert isinstance(signal, Signal.Signal)
-    # 测试方法
-    fig, axs = signal.plot()
-    assert isinstance(fig, plt.Figure)
-    mo.output.append(fig)
-    fig, axs = np.abs(signal.to_Spectra()).halfCut().plot()
-    mo.output.append(fig)
+@app.cell
+def _(Signal):
+    def test_Signal():
+        # 创建实例
+        data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        axis = Signal.t_Axis(len(data), fs=10)
+        Signal.Signal._COPY_DATA_WHEN_INIT = False
+        signal = Signal.Signal(
+            data=data, axis=axis, name="振动", unit="$m/s^2$", label="测点信号"
+        )
+        assert isinstance(signal, Signal.Signal)
+        # 测试方法
+        fig, axs = signal.plot()
+        assert isinstance(fig, plt.Figure)
+        mo.output.append(fig)
+        fig, axs = np.abs(signal.to_Spectra()).halfCut().plot()
+        mo.output.append(fig)
+
+    return
 
 
 @app.cell(hide_code=True)
@@ -300,19 +307,22 @@ def _():
     return
 
 
-@app.function
-def test_Spectra():
-    # 创建实例
-    data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-    axis = Signal.f_Axis(len(data), df=1)
-    spectra = Signal.Spectra(
-        data=data, axis=axis, name="幅值", unit="$m/s^2$", label="测点信号"
-    )
-    assert isinstance(spectra, Signal.Spectra)
-    # 测试方法
-    fig, axs = spectra.plot()
-    assert isinstance(fig, plt.Figure)
-    mo.output.append(fig)
+@app.cell
+def _(Signal):
+    def test_Spectra():
+        # 创建实例
+        data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        axis = Signal.f_Axis(len(data), df=1)
+        spectra = Signal.Spectra(
+            data=data, axis=axis, name="幅值", unit="$m/s^2$", label="测点信号"
+        )
+        assert isinstance(spectra, Signal.Spectra)
+        # 测试方法
+        fig, axs = spectra.plot()
+        assert isinstance(fig, plt.Figure)
+        mo.output.append(fig)
+
+    return
 
 
 @app.cell(hide_code=True)
@@ -332,7 +342,7 @@ def _():
 
 
 @app.cell
-def _():
+def _(Signal):
     files = Signal.Files(
         root=r"R:\Data\PHM数据库\学术公开数据集\寿命预测\XJTU_轴承加速退化振动数据集\Data\35Hz12kN\Bearing1_1",
         type="csv",
@@ -371,7 +381,7 @@ def _():
 
 
 @app.cell
-def _():
+def _(Signal):
     dataset = Signal.Dataset(
         root=r"R:\Data\PHM数据库\学术公开数据集\故障诊断\CWRU_轴承故障振动数据集\Data",
         type=".mat",
@@ -430,7 +440,7 @@ def _():
 
 
 @app.cell
-def _():
+def _(Signal):
     t_axis = Signal.t_Axis(N=1000, fs=1000)
     data = np.random.randn(1000)
     signal = Signal.Signal(data=data, axis=t_axis, name="随机信号", unit="V")

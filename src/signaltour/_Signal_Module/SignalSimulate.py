@@ -1,9 +1,5 @@
 """
-# SignalSimulate
-
----
-
-## 可用的接口
+# SignalSimulate: 信号仿真模块, 提供准周期信号、冲击信号与调制信号等含噪仿真信号的生成方法
 
     - function:
         - `periodic`: 生成仿真含噪准周期信号

@@ -1,14 +1,10 @@
 """
-# ImagePlot
+# ImagePlot: 二维图像模块, 提供时频谱图与热力图等绘制方法
 
----
-
-## 可用的接口
-
-    - function:
-        - `spectrogram_PlotFunc`: 信号时频谱图绘制函数
     - class:
         - `ImagePlot`: 时频谱图、热力图等二维图绘图类
+    - function:
+        - `spectrogram_PlotFunc`: 信号时频谱图绘制函数
 """
 
 __all__ = ["ImagePlot", "spectrogram_PlotFunc"]

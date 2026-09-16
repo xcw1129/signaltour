@@ -1,18 +1,14 @@
 """
 # SpectrumAnalysis: 平稳信号谱分析模块, 提供多种基于DFT的频谱分析方法
 
----
-
-## 可用的接口
-
+    - class:
+        - `Spectrum`: 平稳信号频谱分析方法类
+        - `Hilbert`: 单成分调制信号希尔伯特分析方法类
     - function:
         - `get_window`: 生成指定窗函数的整周期采样序列
         - `find_spectralines`: 检测谱数据中的谱线类局部峰值
         - `convolveCycle`: 计算两个序列数据的循环卷积, 该卷积方式满足DFT的卷积定理
         - `convolve`: 计算两个序列数据的线性卷积
-    - class:
-        - `Spectrum`: 平稳信号频谱分析方法类
-        - `Hilbert`: 单成分调制信号希尔伯特分析方法类
 """
 
 __all__ = [

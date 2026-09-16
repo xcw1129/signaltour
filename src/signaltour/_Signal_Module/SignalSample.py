@@ -1,9 +1,5 @@
 """
-# SignalSample
-
----
-
-## 可用的接口
+# SignalSample: 信号采样模块, 提供重采样、边界延拓与滑窗分段等方法
 
     - function:
         - `resample`: 截取信号任意时间段并重采样, 支持下采样与上采样
