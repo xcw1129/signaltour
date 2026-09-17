@@ -14,8 +14,6 @@
         - `Files`: 数据文件批量管理类, 支持单一目录下指定类型数据文件的快速筛选与批量加载
         - `Folder`: 数据文件夹管理类, 支持快速预览和批量检索、筛选和加载数据文件
         - `Dataset`: 数据集扫描与管理类, 支持自动识别层级结构并发现、加载数据文件, 支持嵌套键索引
-    - function:
-        - `set_logging_level`: 设置当前模块的日志显示级别
 ## SignalSimulate: 信号仿真模块, 提供准周期信号、冲击信号与调制信号等含噪仿真信号的生成方法
     - function:
         - `periodic`: 生成仿真含噪准周期信号
@@ -35,11 +33,11 @@
 # ruff: noqa: F403
 # ruff: noqa: I001
 
-from ._Signal_Module.core import *
-from ._Signal_Module.SignalRead import *
-from ._Signal_Module.SignalSimulate import *
-from ._Signal_Module.SignalSample import *
-from ._Signal_Module.SignalFilter import *
+from ._Signal_Module._core import *
+from ._Signal_Module._SignalRead import *
+from ._Signal_Module._SignalSimulate import *
+from ._Signal_Module._SignalSample import *
+from ._Signal_Module._SignalFilter import *
 
 if __name__ == "__main__":
     from script.docstring import update_package_docstring

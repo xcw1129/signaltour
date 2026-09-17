@@ -25,14 +25,12 @@
 # ruff: noqa: F403
 # ruff: noqa: I001
 
-from ._Plot_Module.core import *
-from ._Plot_Module.PlotPlugin import *
-from ._Plot_Module.LinePlot import *
-from ._Plot_Module.ImagePlot import *
+from ._Plot_Module._core import *
+from ._Plot_Module._PlotPlugin import *
+from ._Plot_Module._LinePlot import *
+from ._Plot_Module._ImagePlot import *
 
 if __name__ == "__main__":
     from script.docstring import update_package_docstring
 
-    update_package_docstring(
-        __file__, summary="波形图、一维/二维谱图和测试统计图等绘图可视化子包"
-    )
+    update_package_docstring(__file__, summary="波形图、一维/二维谱图和测试统计图等绘图可视化子包")

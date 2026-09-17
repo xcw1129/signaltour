@@ -12,7 +12,7 @@
 
 __all__ = ["Axis", "Series", "t_Axis", "f_Axis", "Signal", "Spectra"]
 
-from .._Assist_Module.Dependencies import (
+from .._Assist_Module._Dependencies import (
     NDArrayOperatorsMixin,
     Optional,
     Self,
@@ -57,7 +57,6 @@ class Axis:
     -------
     - copy()
         返回拷贝对象, 与原对象完全独立
-
     - to_pos_index(key)
         将物理索引转换为位置索引
     """
@@ -231,13 +230,10 @@ class Series(NDArrayOperatorsMixin):
     -------
     - set_label(label: str)
         修改序列标签并返回自身
-
     - copy()
         返回拷贝对象, 与原对象完全独立
-
     - plot(**kwargs) -> Tuple
         绘制序列数据的波形图
-
     - template(data: Optional[np.ndarray] = None)
         继承元信息生成新对象, 方便快速创建同类对象
     """
@@ -434,7 +430,7 @@ class Series(NDArrayOperatorsMixin):
 
     def plot(self, **kwargs) -> Tuple:
         """绘制序列数据的波形图"""
-        from .._Plot_Module.LinePlot import PlotFunc_waveform
+        from .._Plot_Module._LinePlot import PlotFunc_waveform
 
         fig, axs = PlotFunc_waveform(self, **kwargs)
         return fig, axs
@@ -477,10 +473,8 @@ class t_Axis(Axis):
     -------
     - copy()
         返回拷贝对象, 与原对象完全独立
-
     - to_pos_index(key)
         将物理索引转换为位置索引
-
     - to_f_axis(f0: float = 0.0)
         转换为频率坐标轴
     """
@@ -618,7 +612,6 @@ class f_Axis(Axis):
     -------
     - copy()
         返回拷贝对象, 与原对象完全独立
-
     - to_pos_index(key)
         将物理索引转换为位置索引
     """
@@ -709,16 +702,12 @@ class Signal(Series):
     -------
     - set_label(label: str)
         修改序列标签并返回自身
-
     - copy()
         返回拷贝对象, 与原对象完全独立
-
     - plot(**kwargs) -> Tuple
         绘制序列数据的波形图
-
     - template(data: Optional[np.ndarray] = None)
         继承元信息生成新对象, 方便快速创建同类对象
-
     - to_Spectra() -> Spectra
         转换信号到其频谱
     """
@@ -765,7 +754,7 @@ class Signal(Series):
     # 外部用户方法
     def to_Spectra(self) -> "Spectra":
         """转换信号到其频谱"""
-        from .._Analysis_Module.SpectrumAnalysis import SpectrumAnalysis
+        from .._Analysis_Module._SpectrumAnalysis import SpectrumAnalysis
 
         spc = SpectrumAnalysis(self).cft(winType="矩形窗", padTimes=0)  # 保持原始长度, 不延拓
         return spc
@@ -792,16 +781,12 @@ class Spectra(Series):
     -------
     - set_label(label: str)
         修改序列标签并返回自身
-
     - copy()
         返回拷贝对象, 与原对象完全独立
-
     - plot(**kwargs) -> Tuple
         绘制序列数据的波形图
-
     - template(data: Optional[np.ndarray] = None)
         继承元信息生成新对象, 方便快速创建同类对象
-
     - halfCut() -> Self
         裁剪为单边谱
     """

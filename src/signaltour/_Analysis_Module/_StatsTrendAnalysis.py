@@ -7,11 +7,11 @@
 
 __all__ = ["StatsTrendAnalysis"]
 
-from .._Assist_Module.Dependencies import Optional, Tuple, np, stats
-from .._Plot_Module.LinePlot import PlotFunc_waveform
-from .._Signal_Module.core import Series, t_Axis
-from .._Signal_Module.SignalSample import slice
-from .core import BaseAnalysis
+from .._Assist_Module._Dependencies import Optional, Tuple, np, stats
+from .._Plot_Module._LinePlot import PlotFunc_waveform
+from .._Signal_Module._core import Series, t_Axis
+from .._Signal_Module._SignalSample import slice
+from ._core import BaseAnalysis
 
 
 # --------------------------------------------------------------------------------------------#

@@ -8,12 +8,12 @@
 
 __all__ = ["CWTAnalysis", "DWTAnalysis"]
 
-from .._Assist_Module.Dependencies import Dict, List, Optional, fft, linalg, np, signal
-from .._Plot_Module.ImagePlot import spectrogram_PlotFunc
-from .._Plot_Module.LinePlot import LinePlot
-from .._Signal_Module.core import Signal, t_Axis
-from .core import BaseAnalysis
-from .ModeAnalysis import PlotFunc_decResult
+from .._Assist_Module._Dependencies import Dict, List, Optional, fft, linalg, np, signal
+from .._Plot_Module._ImagePlot import spectrogram_PlotFunc
+from .._Plot_Module._LinePlot import LinePlot
+from .._Signal_Module._core import Signal, t_Axis
+from ._core import BaseAnalysis
+from ._ModeAnalysis import PlotFunc_decResult
 
 # --------------------------------------------------------------------------------------------#
 # --------------------------------------------------------------------------------#

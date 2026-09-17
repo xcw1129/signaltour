@@ -22,11 +22,11 @@ __all__ = [
     "VMDAnalysis",
 ]
 
-from .._Assist_Module.Dependencies import Optional, fft, interpolate, np, signal
-from .._Plot_Module.LinePlot import LinePlot, PlotFunc_decResult, PlotFunc_waveform
-from .._Signal_Module.core import Signal, Spectra, f_Axis
-from .._Signal_Module.SignalSample import pad
-from .core import BaseAnalysis
+from .._Assist_Module._Dependencies import Optional, fft, interpolate, np, signal
+from .._Plot_Module._LinePlot import LinePlot, PlotFunc_decResult, PlotFunc_waveform
+from .._Signal_Module._core import Signal, Spectra, f_Axis
+from .._Signal_Module._SignalSample import pad
+from ._core import BaseAnalysis
 
 
 # --------------------------------------------------------------------------------------------#

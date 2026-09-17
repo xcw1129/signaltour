@@ -38,16 +38,14 @@
 # ruff: noqa: F403
 # ruff: noqa: I001
 
-from ._Analysis_Module.core import *
-from ._Analysis_Module.StatsTrendAnalysis import *
-from ._Analysis_Module.SpectrumAnalysis import *
-from ._Analysis_Module.TimeFreqAnalysis import *
-from ._Analysis_Module.WaveletAnalysis import *
-from ._Analysis_Module.ModeAnalysis import *
+from ._Analysis_Module._core import *
+from ._Analysis_Module._StatsTrendAnalysis import *
+from ._Analysis_Module._SpectrumAnalysis import *
+from ._Analysis_Module._TimeFreqAnalysis import *
+from ._Analysis_Module._WaveletAnalysis import *
+from ._Analysis_Module._ModeAnalysis import *
 
 if __name__ == "__main__":
     from script.docstring import update_package_docstring
 
-    update_package_docstring(
-        __file__, summary="统计分析、谱分析、非平稳时频分析等信号分析子包"
-    )
+    update_package_docstring(__file__, summary="统计分析、谱分析、非平稳时频分析等信号分析子包")

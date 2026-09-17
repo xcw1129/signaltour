@@ -5,13 +5,11 @@
         - `Files`: 数据文件批量管理类, 支持单一目录下指定类型数据文件的快速筛选与批量加载
         - `Folder`: 数据文件夹管理类, 支持快速预览和批量检索、筛选和加载数据文件
         - `Dataset`: 数据集扫描与管理类, 支持自动识别层级结构并发现、加载数据文件, 支持嵌套键索引
-    - function:
-        - `set_logging_level`: 设置当前模块的日志显示级别
 """
 
-__all__ = ["set_logging_level", "Files", "Folder", "Dataset"]
+__all__ = ["Files", "Folder", "Dataset"]
 
-from .._Assist_Module.Dependencies import (
+from .._Assist_Module._Dependencies import (
     Any,
     Callable,
     Dict,
@@ -36,27 +34,6 @@ from .._Assist_Module.Dependencies import (
 # 初始化日志记录器
 logger = logging.getLogger(__name__)
 Filesdata: TypeAlias = pd.DataFrame | Dict[str, pd.DataFrame]
-
-
-def set_logging_level(level: int | str) -> None:
-    """
-    设置当前模块的日志显示级别
-
-    Parameters
-    ----------
-    level : int or str
-        日志级别, 如 logging.INFO, 'DEBUG', 'WARNING' 等
-    """
-    if isinstance(level, str):
-        level = level.upper()
-    logger.setLevel(level)
-    # 确保至少有一个处理器
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("> %(levelname)s - %(asctime)s\n\t%(message)s", datefmt="%H:%M:%S")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    logger.info(f"模块级别设置: level={level}, module=SignalRead")
 
 
 # --------------------------------------------------------------------------------------------#
@@ -121,8 +98,8 @@ class Files:
         # 验证文件有效性并收集基础信息
         if records is None:
             if not rootpath.exists() or not rootpath.is_dir():
-                logger.error(f"Files初始化失败: root={rootpath}, reason=路径不存在或非文件夹")
-                raise ValueError("输入的目录路径不存在或不是文件夹")
+                # 异常本身即最强的日志记录, 交由应用层统一处理, 避免重复报告
+                raise ValueError(f"输入的目录路径不存在或不是文件夹: {rootpath}")
             # ----------------------------------------------------------------#
             # 筛选有效数据文件名列表
             if names is None:
@@ -215,7 +192,7 @@ class Files:
         if table.empty:
             new_files._fileTable = pd.DataFrame(columns=Files._fileTableCols)
         else:
-            new_files._fileTable: pd.DataFrame = table.reset_index(drop=True)
+            new_files._fileTable = table.reset_index(drop=True)
         new_files._fileTable.attrs = self._fileTable.attrs.copy()
         return new_files
 
@@ -379,8 +356,8 @@ class Files:
                 all_df = pd.concat(df_list, axis=axis, ignore_index=True if axis == 0 else False)
                 all_df = all_df.to_frame() if isinstance(all_df, pd.Series) else all_df
                 logger.debug(f"Files合并完成: root={self.rootpath}, lines={len(all_df)}, columns={all_df.columns}")
-            except Exception as e:
-                logger.error(f"Files合并失败: root={self.rootpath}, error={e}")
+            except Exception:
+                logger.error(f"Files合并失败: root={self.rootpath}", exc_info=True)
                 return None
         else:
             # 组织为字典返回
@@ -515,8 +492,8 @@ class Files:
                 logger.warning(f"读取异常: name={filepath.name}, status=内容为空")
             else:
                 logger.debug(f"读取成功: name={filepath.name}, lines={len(df)}, columns={df.columns}")
-        except Exception as e:
-            logger.error(f"读取失败: name={filepath.name}, error={e}")
+        except Exception:
+            logger.error(f"读取失败: name={filepath.name}", exc_info=True)
             return pd.DataFrame()
         return df
 
@@ -533,8 +510,8 @@ class Files:
                 logger.warning(f"读取异常: name={filepath.name}, status=内容为空")
             else:
                 logger.debug(f"读取成功: name={filepath.name}, lines={len(df)}, columns={df.columns}")
-        except Exception as e:
-            logger.error(f"读取失败: name={filepath.name}, error={e}")
+        except Exception:
+            logger.error(f"读取失败: name={filepath.name}", exc_info=True)
             return pd.DataFrame()
         return df
 
@@ -551,8 +528,8 @@ class Files:
                 logger.warning(f"读取异常: name={filepath.name}, status=内容为空")
             else:
                 logger.debug(f"读取成功: name={filepath.name}, lines={len(df)}, columns={df.columns}")
-        except Exception as e:
-            logger.error(f"读取失败: name={filepath.name}, error={e}")
+        except Exception:
+            logger.error(f"读取失败: name={filepath.name}", exc_info=True)
             return pd.DataFrame()
         return df
 
@@ -566,8 +543,8 @@ class Files:
         try:
             mat = loadmat(filepath)
             logger.debug(f"预读取成功: name={filepath.name}, vars={list(mat.keys())}")
-        except Exception as e:
-            logger.error(f"读取失败: name={filepath.name}, error={e}")
+        except Exception:
+            logger.error(f"读取失败: name={filepath.name}", exc_info=True)
             return pd.DataFrame()
         # ------------------------------------------------------------------------#
         # 记录变量与元数据
@@ -601,8 +578,8 @@ class Files:
                 logger.debug(f"数据解析成功: vars={list(arr.keys())}, attrs={df.attrs}")
                 logger.debug(f"读取成功: name={filepath.name}, lines={len(df)}, columns={df.columns}")
             return df
-        except Exception as e:
-            logger.error(f"数据解析失败: error={e}")
+        except Exception:
+            logger.error(f"数据解析失败: name={filepath.name}", exc_info=True)
             return pd.DataFrame()
 
     _read_funcs: Dict[str, Callable[[Path], pd.DataFrame]] = {
@@ -890,7 +867,7 @@ class Dataset(Folder):
         self._filetype = Files._check_filetype(type)
         self._validnode: int = 0  # 挂载数据文件节点计数
         if not self._rootpath.exists() or not self._rootpath.is_dir():
-            logger.error(f"Dataset初始化失败: root={self._rootpath}, reason=路径不存在或非文件夹")
+            # 异常本身即最强的日志记录, 交由应用层统一处理, 避免重复报告
             raise ValueError(f"root={self._rootpath}: 指定的路径不存在或不是文件夹")
         self.setname = name
         # 2. 初始化树根节点 (继承自 Folder/anytree.Node)
@@ -964,8 +941,8 @@ class Dataset(Folder):
                     # 处理目录: 收集子目录路径以待递归
                     elif entry.is_dir(follow_symlinks=False):
                         sub_paths.append(Path(entry.path))
-        except Exception as e:
-            logger.warning(f"节点扫描失败: path={path}, error={e}")
+        except Exception:
+            logger.warning(f"节点扫描失败: path={path}", exc_info=True)
             return None
         # ------------------------------------------------------------------------#
         # 2. 挂载数据文件
@@ -977,8 +954,8 @@ class Dataset(Folder):
                 node.files = Files(root=str(path), type=self._filetype, records=target_records)
                 if not node.is_leaf:
                     logger.warning(f"节点扫描异常: path={path}, reason=非叶子节点发现Files对象")
-            except Exception as e:
-                logger.error(f"节点挂载文件失败: path={path}, error={e}")
+            except Exception:
+                logger.error(f"节点挂载文件失败: path={path}", exc_info=True)
         # ------------------------------------------------------------------------#
         # 3. 递归处理子目录
         for sub_path in sub_paths:

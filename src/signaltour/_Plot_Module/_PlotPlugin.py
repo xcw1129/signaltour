@@ -8,8 +8,8 @@
 
 __all__ = ["PeakfinderPlugin", "PosNagMaskPlugin"]
 
-from .._Assist_Module.Dependencies import Dict, plt
-from .core import PlotPlugin
+from .._Assist_Module._Dependencies import Dict, plt
+from ._core import PlotPlugin
 
 # --------------------------------------------------------------------------------------------#
 # --------------------------------------------------------------------------------#
@@ -41,7 +41,7 @@ class PeakfinderPlugin(PlotPlugin):
         if Spc is None:
             return  # 插件仅适用于谱图
         # 寻找峰值
-        from .._Analysis_Module.SpectrumAnalysis import find_spectralines
+        from .._Analysis_Module._SpectrumAnalysis import find_spectralines
 
         peak_idx = find_spectralines(Spc.data, distance=self.distance, threshold=self.threshold)
         if peak_idx.size == 0:

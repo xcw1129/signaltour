@@ -20,10 +20,10 @@ __all__ = [
     "HilbertAnalysis",
 ]
 
-from .._Assist_Module.Dependencies import Callable, Optional, fft, linalg, np, signal
-from .._Plot_Module.LinePlot import PlotFunc_spectrum
-from .._Signal_Module.core import Signal, Spectra, f_Axis
-from .core import BaseAnalysis
+from .._Assist_Module._Dependencies import Callable, Optional, fft, linalg, np, signal
+from .._Plot_Module._LinePlot import PlotFunc_spectrum
+from .._Signal_Module._core import Signal, Spectra, f_Axis
+from ._core import BaseAnalysis
 
 
 # --------------------------------------------------------------------------------------------#

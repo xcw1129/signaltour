@@ -8,7 +8,7 @@
 
 __all__ = ["BasePlot", "PlotPlugin"]
 
-from .._Assist_Module.Dependencies import (
+from .._Assist_Module._Dependencies import (
     Optional,
     Self,
     cycler,

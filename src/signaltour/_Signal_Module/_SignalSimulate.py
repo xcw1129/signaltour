@@ -9,8 +9,8 @@
 
 __all__ = ["periodic", "impulse", "modulation"]
 
-from .._Assist_Module.Dependencies import Callable, Optional, np
-from .core import Signal, t_Axis
+from .._Assist_Module._Dependencies import Callable, Optional, np
+from ._core import Signal, t_Axis
 
 
 # --------------------------------------------------------------------------------------------#
