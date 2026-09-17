@@ -180,7 +180,7 @@ def update_package_docstring(fpath: str, summary: str):
             collected_sections.append(doc_section)
 
     # 4. 构建聚合模块文档字符串
-    aggregate_title = os.path.splitext(os.path.basename(fpath))[0]
+    aggregate_title = os.path.splitext(os.path.basename(fpath))[0].lstrip("_")  # 标题不含模块文件名的下划线前缀
     header = f"\n# {aggregate_title}" + (f": {summary}" if summary else "") + "\n\n"
     docstring = '"""' + header + "\n".join(collected_sections) + '\n"""\n'
 
@@ -224,7 +224,10 @@ def _strip_docstring_quotes(docstring: str):
 
 
 def _collect_imported_subpackages(tree: ast.Module, fpath: str):
-    """收集AST中导入的公有子包(接口导出文件)路径, 跳过私有模块"""
+    """收集AST中导入的子包接口导出文件路径, 跳过通配符与深层模块
+
+    注: 接口导出文件名统一带"_"前缀(如`_Signal.py`), 故此处不做下划线过滤
+    """
     module_files = []
     seen = set()
     for node in tree.body:
@@ -234,7 +237,7 @@ def _collect_imported_subpackages(tree: ast.Module, fpath: str):
             continue  # 仅处理包的直接子模块, 跳过深层模块
         names = [node.module] if node.module else [alias.name for alias in node.names]
         for name in names:
-            if not name or name == "*" or name.startswith("_"):
+            if not name or name == "*":
                 continue
             candidate = _resolve_imported_module_file(fpath, name, 1)
             if candidate and os.path.exists(candidate) and candidate not in seen:
