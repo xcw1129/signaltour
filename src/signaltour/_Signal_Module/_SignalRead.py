@@ -40,6 +40,10 @@ Filesdata: TypeAlias = pd.DataFrame | Dict[str, pd.DataFrame]
 # --------------------------------------------------------------------------------#
 # ------------------------------------------------------------------------#
 # ----------------------------------------------------------------#
+class LoadData:
+    pass
+
+
 class Files:
     """
     数据文件批量管理类, 支持单一目录下指定类型数据文件的快速筛选与批量加载
@@ -645,8 +649,6 @@ class Folder(anytree.Node):
         该Folder直接挂载的Files对象
     allfiles : List[Files]
         该Folder挂载的所有Files对象
-    allfolders : List[Folder]
-        该Folder下所有子节点Folder
     stats : Dict
         该Folder当前状态, 包括有效叶子节点数, 数据文件总数, 总大小[MB]
 
@@ -654,14 +656,19 @@ class Folder(anytree.Node):
     -------
     - info() -> None
         打印数据集信息和文件夹结构
-    - loadAll(**kwargs) -> Dict[str, Filesdata] | None
-        加载当前数据文件夹及所有子节点挂载的 Files 对象
+    - matchfiles(match, filter=None, query=None) -> List[Files]
+        筛选并返回该Folder挂载的符合匹配条件的Files对象
     - loadMatch(match, **kwargs) -> Dict[str, Filesdata] | None
         匹配筛选加载当前数据文件夹内及其所有子节点挂载的 Files 对象
+    - loadAll(**kwargs) -> Dict[str, Filesdata] | None
+        加载当前数据文件夹及所有子节点挂载的 Files 对象
     """
 
     # --------------------------------------------------------------------------------#
     # Python特性支持
+    def __len__(self) -> int:
+        return len(self.children)
+
     def __getitem__(self, item) -> Self | List[Self]:
         # 1. 整数与切片索引 (基于子节点列表顺序)
         if isinstance(item, (int, slice)):
@@ -687,11 +694,6 @@ class Folder(anytree.Node):
         for p in self.path[1:]:  # 跳过根节点, 拼接子节点路径
             rootpath_base = rootpath_base / p.name
         return rootpath_base
-
-    @property
-    def allfolders(self) -> List["Folder"]:
-        """该Folder下所有子节点Folder"""
-        return self.leaves
 
     @property
     def stats(self) -> Dict:
@@ -759,44 +761,64 @@ class Folder(anytree.Node):
             Dictfilesdata[str(files.rootpath)] = filesdata  # 使用根路径区分不同 Files 加载结果
         return Dictfilesdata
 
-    def loadAll(self, **kwargs) -> Dict[str, Filesdata] | None:
+    def matchfiles(self, match: str, filter: Optional[str] = None, query: Optional[str] = None) -> List[Files]:
         """
-        加载当前数据文件夹及所有子节点挂载的 Files 对象
+        筛选并返回该Folder挂载的符合匹配条件的Files对象
 
         Parameters
         ----------
-        merge : bool, default: True
-            单个Files加载结果是否合并
-        mode : str, default: 'hstack'
-            合并模式, 'hstack'列并排合并, 'vstack'列堆叠合并 (仅当merge=True时有效)
-        isParallel : bool, default: False
-            单个Files加载是否并行读取
-        parallelNum : int, optional
-            并行读取时的线程数
-        usePyarrow : bool, default: False
-            单个Files加载是否启用 pyarrow 引擎加速文件读取(需安装 pyarrow 库)
+        match : str
+            Folder级筛选参数，使用文件夹名关键词进行工况筛选，例如 'testA, case1'
+        filter : str, optional
+            Files级筛选参数，使用文件名正则模式进行数据文件筛选，例如 '.*_test.*'
+        query : str, optional
+            Files级筛选参数，使用文件属性pandas query语法进行数据文件筛选，例如 '`size[MB]` > 1.0'
 
-        return
-        ------
-        Dict[str, Filesdata] | None
-            汇总加载结果. 各个 Files 的根路径到其加载结果的字典. 若无任何有效加载结果则返回 None
+        Returns
+        -------
+        List[Files]
+            符合条件的Files对象列表
         """
-        # 搜集
-        Listfiles = self.allfiles
+        # 1. Folder级匹配筛选
+        # 解析搜索关键词
+        patterns: List[str] = [p for p in re.split(r"[,，\s]+", match) if p]
+        nodes_matched: List[Folder] = []
+        nodes_to_search: List[Folder] = [self]
+        self_path_len = len(self.path)
+        # 广度优先搜索子节点
+        while nodes_to_search:
+            node = nodes_to_search.pop(0)
+            # 获取从 self 到当前 node 的工况名称链 (过滤掉 self 之前的祖先节点)
+            chain_names = [n.name for n in node.path[self_path_len - 1 :]]
+            # 校验工况链是否匹配所有关键词
+            match_success = True
+            for p in patterns:  # 筛选条件为空视为匹配成功
+                # 任一工况名称匹配该关键词即可
+                if not any(re.search(p, name) for name in chain_names):
+                    match_success = False
+                    break
+            if match_success:
+                # 节点匹配成功, 子节点停止搜索
+                nodes_matched.append(node)
+            else:
+                # 节点未匹配, 继续搜索下级子节点
+                nodes_to_search.extend(list(node.children))
+        if not nodes_matched:
+            return []
         # ------------------------------------------------------------------------#
-        # 加载
-        start_time = time()
-        logger.info(f"Folder加载开始: node={self.name}, count={len(Listfiles)}")
-        Dictfilesdata = Folder._load_batch(Listfiles, **kwargs)
-        if not Dictfilesdata:
-            logger.warning(f"Folder加载中止: node={self.name}, reason=未从任何Files中读取到有效数据")
-            return None
-        consumed_time = time() - start_time
-        logger.info(
-            f"Folder加载完成: node={self.name}, count={len(Listfiles)}, done={len(Dictfilesdata)}, "
-            f"elapsed={consumed_time:.2f}s"
-        )
-        return Dictfilesdata
+        # 2. Files级匹配筛选
+        Listfiles: List[Files] = []
+        for node in nodes_matched:
+            for sub_node in anytree.PreOrderIter(node):
+                if hasattr(sub_node, "_files"):
+                    files_matched: Files = sub_node._files
+                    if filter:
+                        files_matched = files_matched.filter(filter)
+                    if query:
+                        files_matched = files_matched.query(query)
+                    if len(files_matched) > 0:
+                        Listfiles.append(files_matched)
+        return Listfiles
 
     def loadMatch(
         self,
@@ -804,7 +826,7 @@ class Folder(anytree.Node):
         filter: Optional[str] = None,
         query: Optional[str] = None,
         **kwargs,
-    ) -> Dict[str, Filesdata] | None:
+    ) -> Dict[str, Filesdata]:
         """
         匹配筛选加载当前数据文件夹内及其所有子节点挂载的 Files 对象.
 
@@ -829,79 +851,70 @@ class Folder(anytree.Node):
         usePyarrow : bool, default: False
             单个Files加载是否启用 pyarrow 引擎加速文件读取(需安装 pyarrow 库)
 
-        return
-        ------
-        Dict[str, Filesdata] | None
-            汇总加载结果. 各个 Files 的根路径到其加载结果的字典. 若无任何有效加载结果则返回 None
+        Returns
+        -------
+        Dict[str, Filesdata]
+            汇总加载结果. 各个 Files 的根路径到其加载结果的字典
         """
+        # 搜集
+        logger.info(f"Folder匹配筛选开始: node={self.name}, match={match}, filter={filter}, query={query}")
+        Listfiles = self.matchfiles(match=match, filter=filter, query=query)
+        if Listfiles != []:
+            logger.info(f"Folder匹配筛选完成: total={len(self.allfiles)}, match={len(Listfiles)}")  # noqa: E501
+        else:
+            logger.warning(f"Folder匹配加载中止: node={self.name}, reason=筛选后无可加载文件")
+            return {}
+        # 加载
         start_time = time()
-        # ------------------------------------------------------------------------#
-        # 1. Folder级匹配筛选
-        logger.info(f"Folder检索开始: node={self.name}, match={match}, filter={filter}, query={query}")
-        # 解析搜索关键词
-        patterns: List[str] = [p for p in re.split(r"[,，\s]+", match) if p]
-        if not patterns:
-            logger.warning(f"Folder检索中止: node={self.name}, match={match}, reason=检索关键词为空")
-            return None
-        matched_nodes: List[Folder] = []
-        nodes_to_search: List[Folder] = [self]
-        self_path_len = len(self.path)
-        # 广度优先搜索子节点
-        while nodes_to_search:
-            node = nodes_to_search.pop(0)
-            # 获取从 self 到当前 node 的工况名称链 (过滤掉 self 之前的祖先节点)
-            chain_names = [n.name for n in node.path[self_path_len - 1 :]]
-            # 校验工况链是否匹配所有关键词
-            match_success = True
-            for p in patterns:
-                # 任一工况名称匹配该关键词即可
-                if not any(re.search(p, name) for name in chain_names):
-                    match_success = False
-                    break
-            if match_success:
-                # 节点匹配成功, 子节点停止搜索
-                matched_nodes.append(node)
-            else:
-                # 节点未匹配, 继续搜索下级子节点
-                nodes_to_search.extend(list(node.children))
-        if not matched_nodes:
-            logger.warning(
-                f"Folder检索中止: node={self.name}, match={match}, "
-                f"reason=未找到任何匹配节点. 可检查 match 关键词拼写, 或用 info() 查看文件夹结构"
+        Dictfilesdata = Folder._load_batch(Listfiles, **kwargs)
+        if Dictfilesdata != {}:
+            consumed_time = time() - start_time
+            logger.info(
+                f"Folder匹配加载完成: node={self.name}, match={match}, "
+                f"done={len(Dictfilesdata)}, elapsed={consumed_time:.2f}s"
             )
-            return None
-        # ------------------------------------------------------------------------#
-        # 2. Files级匹配筛选
-        logger.info(f"检索完成: node={self.name}, match={match}, matched={len(matched_nodes)}")
-        listFiles: List[Files] = []
-        for node in matched_nodes:
-            for sub_node in anytree.PreOrderIter(node):
-                if hasattr(sub_node, "_files"):
-                    matched_files: Files = sub_node._files
-                    if filter:
-                        matched_files = matched_files.filter(filter)
-                    if query:
-                        matched_files = matched_files.query(query)
-                    if len(matched_files) > 0:
-                        listFiles.append(matched_files)
-        logger.info(f"筛选完成: node={self.name}, filter={filter}, query={query}, count={len(listFiles)}")
-        # ------------------------------------------------------------------------#
-        # 3. 对所有筛选后Files进行加载
-        if not listFiles:
-            logger.warning(
-                f"Folder检索中止: node={self.name}, match={match}, filter={filter}, query={query}, "
-                f"reason=筛选后无可加载文件. 可放宽 filter/query 条件"
+        else:
+            logger.warning(f"Folder匹配加载中止: node={self.name}, reason=未从筛选到的Files中读取到有效数据")
+            return {}
+        return Dictfilesdata
+
+    def loadAll(self, **kwargs) -> Dict[str, Filesdata]:
+        """
+        加载当前数据文件夹及所有子节点挂载的 Files 对象
+
+        Parameters
+        ----------
+        merge : bool, default: True
+            单个Files加载结果是否合并
+        mode : str, default: 'hstack'
+            合并模式, 'hstack'列并排合并, 'vstack'列堆叠合并 (仅当merge=True时有效)
+        isParallel : bool, default: False
+            单个Files加载是否并行读取
+        parallelNum : int, optional
+            并行读取时的线程数
+        usePyarrow : bool, default: False
+            单个Files加载是否启用 pyarrow 引擎加速文件读取(需安装 pyarrow 库)
+
+        Returns
+        -------
+        Dict[str, Filesdata]
+            汇总加载结果. 各个 Files 的根路径到其加载结果的字典
+        """
+        # 搜集
+        Listfiles = self.allfiles
+        # 加载
+        start_time = time()
+        logger.info(f"Folder加载开始: node={self.name}, count={len(Listfiles)}")
+        Dictfilesdata = Folder._load_batch(Listfiles, **kwargs)
+        if Dictfilesdata != {}:
+            consumed_time = time() - start_time
+            logger.info(
+                f"Folder加载完成: node={self.name}, count={len(Listfiles)}, done={len(Dictfilesdata)}, "
+                f"elapsed={consumed_time:.2f}s"
             )
-            return None
-        Dictfilesdata = Folder._load_batch(listFiles, **kwargs)
-        if not Dictfilesdata:
-            logger.warning(f"Folder检索中止: node={self.name}, match={match}, reason=检索到的Files无任何数据")
-            return None
-        consumed_time = time() - start_time
-        logger.info(
-            f"Folder检索完成: node={self.name}, match={match}, found={len(matched_nodes)}, "
-            f"done={len(Dictfilesdata)}, elapsed={consumed_time:.2f}s"
-        )
+        else:
+            logger.warning(f"Folder加载中止: node={self.name}, reason=未从任何Files中读取到有效数据")
+            return {}
         return Dictfilesdata
 
 
@@ -924,8 +937,6 @@ class Dataset(Folder):
         该Folder直接挂载的Files对象
     allfiles : List[Files]
         该Folder挂载的所有Files对象
-    allfolders : List[Folder]
-        该Folder下所有子节点Folder
     stats : Dict
         该Folder当前状态, 包括有效叶子节点数, 数据文件总数, 总大小[MB]
 
@@ -933,10 +944,12 @@ class Dataset(Folder):
     -------
     - info() -> None
         打印数据集信息和文件夹结构
+    - matchfiles(match, filter=None, query=None) -> List[Files]
+        筛选并返回该Folder挂载的符合匹配条件的Files对象
+    - loadMatch(match, **kwargs) -> Dict[str, Filesdata] | None
+        匹配筛选加载当前数据文件夹内及其所有子节点挂载的 Files 对象
     - loadAll(**kwargs) -> Dict[str, Filesdata] | None
-        加载整个数据集所有节点挂载的 Files 对象
-    - loadMatch(match, filter=None, query=None, **kwargs) -> Dict[str, Filesdata] | None
-        匹配筛选加载整个数据集所有节点挂载的 Files 对象
+        加载当前数据文件夹及所有子节点挂载的 Files 对象
     - refresh() -> Self
         刷新数据集结构, 重新扫描磁盘目录
     """
