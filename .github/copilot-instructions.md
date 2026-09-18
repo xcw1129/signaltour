@@ -38,7 +38,7 @@ signaltour 的设计哲学是面向对象和易于扩展，其接口架构体现
 
 ## 参考文件
 
-- 核心框架： `signaltour/_Signal_Module/core.py`, `signaltour/_Plot_Module/core.py`, `signaltour/_Analysis_Module/core.py`
+- 核心框架： `signaltour/_Signal_Module/_core.py`, `signaltour/_Plot_Module/_core.py`, `signaltour/_Analysis_Module/_core.py`
 - 测试与实验：`test/`, `test.ipynb`
 - 安装与分发：`signaltour/__init__.py`, `signaltour/Signal.py`, `signaltour/Plot.py`, `signaltour/Analysis.py`, `setup.py`, `.github\workflows\python-publish.yml`
 - 注释规范：`Docstring.txt`
