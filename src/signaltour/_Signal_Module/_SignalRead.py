@@ -56,16 +56,19 @@ class LoadData:
     ----------
     table : pd.DataFrame
         数据文件索引表, 单数据文件即一行, 列为: chain, name, size[MB], modifiedTime, status, attrs
+        合并后转为工况链索引表, 单工况链即一行, 列中不含 name
     chains : List[str]
         索引表中出现过的工况链列表
 
     Methods
     -------
-    - merge(mode='hstack') -> pd.DataFrame | None
-        将当前持有的数据内容合并为单个 DataFrame
+    - merge(mode='hstack') -> Self
+        就地将同一工况链的数据文件合并为单个 DataFrame
     """
 
     _tableCols: List[str] = ["chain", "name", "size[MB]", "modifiedTime", "status", "attrs"]
+    _mergedCols: List[str] = ["chain", "size[MB]", "modifiedTime", "status", "attrs"]  # 合并后的索引表列
+    _statusRank: Dict[str, int] = {"完成": 0, "跳过": 1, "失败": 2}  # 状态严重程度, 合并时取最严重者
 
     def __init__(self, table: pd.DataFrame, payload: Dict[Tuple[str, str], pd.DataFrame]) -> None:
         """
@@ -74,11 +77,11 @@ class LoadData:
         Parameters
         ----------
         table : pd.DataFrame
-            数据文件索引表, 单数据文件即一行
+            数据文件索引表, 单数据文件即一行, 合并后为单工况链一行
         payload : Dict[Tuple[str, str], pd.DataFrame]
-            数据内容载体, 以 (工况链, 文件名) 为键索引已读取到的数据内容
+            数据内容载体, 以 (工况链, 文件名) 为键索引数据内容, 合并后文件名恒为空串
         """
-        if table.columns.tolist() != LoadData._tableCols:
+        if table.columns.tolist() not in (LoadData._tableCols, LoadData._mergedCols):
             raise RuntimeError("数据文件索引表列异常, 无法构建LoadData对象")
         self._table: pd.DataFrame = table
         self._payload: Dict[Tuple[str, str], pd.DataFrame] = payload
@@ -98,16 +101,23 @@ class LoadData:
     # --------------------------------------------------------------------------------#
     # Python特性支持
     def __len__(self) -> int:
-        """数据文件数量, 即索引表行数"""
+        """索引表行数, 未合并时为数据文件数量, 合并后为工况链数量"""
         return len(self._table)
 
     def __iter__(self) -> Iterator[Tuple[str, str, Optional[pd.DataFrame]]]:
-        """迭代器, 按索引表顺序遍历(工况链, 文件名, 数据内容), 未读取到数据的条目数据内容为None"""
-        for chain, name in zip(self._table["chain"], self._table["name"]):
+        """迭代器, 按索引表顺序遍历(工况链, 文件名, 数据内容), 合并后文件名恒为空串, 无数据条目为None"""
+        names = [""] * len(self._table) if self._isMerged else self._table["name"].tolist()
+        for chain, name in zip(self._table["chain"], names):
             yield chain, name, self._payload.get((chain, name))
 
     def __getitem__(self, item) -> pd.DataFrame | Self:
-        """支持二元组与字符串索引, 二元组返回单个数据内容, 字符串返回子工况链LoadData对象"""
+        """
+        支持二元组与字符串索引
+
+        二元组 (工况链, 文件名) 返回单个数据内容, 合并后文件名为空串
+
+        字符串 (工况链) 合并前返回子工况链LoadData对象, 合并后返回该工况链的合并结果
+        """
         # 1. 二元组索引 (工况链, 文件名)
         if isinstance(item, tuple) and len(item) == 2:
             if item in self._payload:
@@ -117,6 +127,12 @@ class LoadData:
         # ------------------------------------------------------------------------#
         # 2. 字符串索引 (工况链)
         elif isinstance(item, str):
+            if self._isMerged:
+                # 已合并: 工况链与合并结果一一对应
+                if (item, "") in self._payload:
+                    return self._payload[(item, "")]
+                else:
+                    raise KeyError(f"key={item}: 未找到对应的合并结果, 可检查table中的读取状态")
             mask = self._table["chain"] == item
             if mask.any():
                 payload = {(chain, name): df for (chain, name), df in self._payload.items() if chain == item}
@@ -127,13 +143,17 @@ class LoadData:
             raise KeyError("LoadData 索引仅支持字符串(工况链)和二元组(工况链, 文件名)")
 
     def __repr__(self) -> str:
-        return f"LoadData(chains={len(self.chains)}, files={len(self)}, loaded={len(self._payload)})"
+        return f"LoadData(chains={len(self.chains)}, rows={len(self)}, loaded={len(self._payload)})"
 
     # --------------------------------------------------------------------------------#
     # 外部用户方法
-    def merge(self, mode: str = "hstack") -> pd.DataFrame | None:
+    def merge(self, mode: str = "hstack") -> Self:
         """
-        将当前持有的数据内容合并为单个DataFrame
+        就地将同一工况链的数据文件合并为单个DataFrame, 并同步合并索引表
+
+        仅合并工况链相同的数据文件(即加载前归属同一个Files对象管理的数据文件), 不同工况链保持相互独立
+
+        合并后索引表去除 name 列, 单工况链即一行, 并逐行聚合数据文件的大小、时间、状态与元数据
 
         Parameters
         ----------
@@ -142,29 +162,72 @@ class LoadData:
 
         Returns
         -------
-        pd.DataFrame | None
-            合并结果. 若当前无任何已读取数据则返回 None
+        Self
+            合并后的当前LoadData对象, 数据内容以 (工况链, '') 为键索引
         """
         if mode not in ("hstack", "vstack"):
             raise ValueError(f"{mode}: 不支持的合并模式, 仅支持: ['hstack', 'vstack']")
-        if len(self._payload) == 0:
-            return None
+        if self._isMerged:
+            logger.warning("合并跳过: reason=数据内容已完成合并")
+            return self
+        if len(self._table) == 0:
+            logger.warning("合并跳过: reason=无数据文件")
+            return self
         start_time = time()
+        source_count = len(self._table)
+        # ------------------------------------------------------------------------#
+        # 逐工况链合并数据文件
+        rows: List[Dict[str, Any]] = []
+        payload: Dict[Tuple[str, str], pd.DataFrame] = {}
+        for chain in self.chains:
+            group: pd.DataFrame = self._table[self._table["chain"] == chain]
+            entries: List[Tuple[str, pd.DataFrame]] = []
+            metadata: Dict = {}
+            for name, attrs in zip(group["name"], group["attrs"]):
+                metadata.update(attrs)  # 同键元数据以靠后的数据文件为准
+                if (chain, name) in self._payload:
+                    entries.append((name, self._payload[(chain, name)]))
+            filesdata = LoadData._stack(entries, mode)
+            if filesdata is not None:
+                payload[(chain, "")] = filesdata
+            rows.append(
+                {
+                    "chain": chain,
+                    "size[MB]": float(group["size[MB]"].sum()),
+                    "modifiedTime": group["modifiedTime"].max(),
+                    "status": max(group["status"], key=lambda status: LoadData._statusRank[status]),
+                    "attrs": metadata,
+                }
+            )
+        # ------------------------------------------------------------------------#
+        # 就地更新索引表与数据内容
+        self._table = pd.DataFrame(rows, columns=LoadData._mergedCols)
+        self._payload = payload
+        consumed_time = time() - start_time
+        logger.info(f"合并完成: mode={mode}, chains={len(rows)}, files={source_count}, elapsed={consumed_time:.2f}s")
+        return self
+
+    # --------------------------------------------------------------------------------#
+    # 合并内部方法
+    @property
+    def _isMerged(self) -> bool:
+        """索引表是否已完成合并, 已合并的索引表不含 name 列"""
+        return "name" not in self._table.columns
+
+    @staticmethod
+    def _stack(entries: List[Tuple[str, pd.DataFrame]], mode: str) -> pd.DataFrame | None:
+        """将同一工况链内的数据内容合并为单个DataFrame, 无有效条目时返回None"""
+        if not entries:
+            return None
         if mode == "hstack":
             # 为避免列名冲突, 添加文件名前缀
             Listdataframe: List[pd.DataFrame] = [
-                df.set_axis([f"{Path(name).stem}#{col}" for col in df.columns], axis=1)
-                for (_, name), df in self._payload.items()
+                df.set_axis([f"{Path(name).stem}#{col}" for col in df.columns], axis=1) for name, df in entries
             ]
             filesdata = pd.concat(Listdataframe, axis=1)
         else:
-            filesdata = pd.concat(list(self._payload.values()), axis=0, ignore_index=True)
-        filesdata = filesdata.to_frame() if isinstance(filesdata, pd.Series) else filesdata
-        consumed_time = time() - start_time
-        logger.info(
-            f"合并完成: mode={mode}, rows={len(filesdata)}, cols={len(filesdata.columns)}, elapsed={consumed_time:.2f}s"
-        )
-        return filesdata
+            filesdata = pd.concat([df for _, df in entries], axis=0, ignore_index=True)
+        return filesdata.to_frame() if isinstance(filesdata, pd.Series) else filesdata
 
     # --------------------------------------------------------------------------------#
     # 内部构建方法
