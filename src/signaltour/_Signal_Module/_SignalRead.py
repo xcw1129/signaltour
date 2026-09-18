@@ -34,6 +34,7 @@ from .._Assist_Module._Dependencies import (
     time,
     util,
 )
+from ._core import Signal, t_Axis
 
 # 初始化日志记录器
 logger = logging.getLogger(__name__)
@@ -64,6 +65,8 @@ class LoadData:
     -------
     - merge(mode='hstack') -> Self
         就地将同一工况链的数据文件合并为单个 DataFrame
+    - to_Signal(fs, name) -> List[Signal]
+        将所有加载数据(每列)转换为 Signal 对象, label 按 '{工况链}#{文件名}#{列名}' 格式生成
     """
 
     _tableCols: List[str] = ["chain", "name", "size[MB]", "modifiedTime", "status", "attrs"]
@@ -118,11 +121,30 @@ class LoadData:
 
         字符串视为索引表的 pandas query 表达式, 筛选后返回子LoadData对象, 无匹配时返回空对象
 
+        Parameters
+        ----------
+        item : Tuple[str, str] | str
+            二元组 (工况链, 文件名) 或索引表的 pandas query 表达式字符串
+
+        Returns
+        -------
+        pd.DataFrame | Self
+            二元组索引返回单个数据内容, 字符串索引返回筛选后的子LoadData对象
+
+        Raises
+        ------
+        KeyError
+            二元组未找到对应数据内容, 或索引类型不受支持
+        ValueError
+            query 表达式无效
+
         Examples
         --------
         >>> loaddata["chain == 'testA/case1'"]
         >>> loaddata["status == '失败'"]
         >>> loaddata["`size[MB]` > 1.0"]
+        >>> loaddata[('testA/case1', 'data1.csv')]  # 未合并时按文件名取数据
+        >>> loaddata[('testA/case1', '')]           # 合并后文件名恒为空串
         """
         # 1. 二元组索引 (工况链, 文件名)
         if isinstance(item, tuple) and len(item) == 2:
@@ -163,12 +185,21 @@ class LoadData:
         Parameters
         ----------
         mode : str, default: 'hstack'
-            合并模式, 'hstack'列并排合并且添加文件名前缀, 'vstack'行堆叠合并
+            合并模式, 'hstack'列并排合并并添加文件名前缀, 'vstack'行堆叠合并
 
         Returns
         -------
         Self
             合并后的当前LoadData对象, 数据内容以 (工况链, '') 为键索引
+
+        Raises
+        ------
+        ValueError
+            传入不支持的合并模式时抛出
+
+        Notes
+        -----
+        重复调用是安全的, 已完成合并或无数据文件时跳过并记录警告日志
         """
         if mode not in ("hstack", "vstack"):
             raise ValueError(f"{mode}: 不支持的合并模式, 仅支持: ['hstack', 'vstack']")
@@ -211,6 +242,35 @@ class LoadData:
         consumed_time = time() - start_time
         logger.info(f"合并完成: mode={mode}, chains={len(rows)}, files={source_count}, elapsed={consumed_time:.2f}s")
         return self
+
+    def to_Signal(self, fs: float, name: str) -> List["Signal"]:
+        """
+        将所有加载数据(每列)转换为Signal对象
+
+        每列数据独立构建一个Signal对象, 其 label 按 '{工况链}#{文件名}#{列名}' 格式生成
+        (合并后文件名为空串), 便于后续绘图与结果追踪.
+        读取状态非完成的条目(数据为None或空表)将被跳过
+
+        Parameters
+        ----------
+        fs : float
+            数据采样频率
+        name : str
+            数据类型名称, 同时作为生成的Signal对象名称
+
+        Returns
+        -------
+        List[Signal]
+            转换的Signal对象列表, 顺序与索引表一致, 不含被跳过的空数据条目
+        """
+        Listsig: List[Signal] = []
+        for chain, name, df in self:
+            if df is not None and not df.empty:
+                for col in df.columns:
+                    data = np.asarray(df[col].dropna(), copy=True)
+                    sig = Signal(axis=t_Axis(fs=fs, N=len(data)), data=data, name=name, label=f"{chain}#{name}#{col}")
+                    Listsig.append(sig)
+        return Listsig
 
     # --------------------------------------------------------------------------------#
     # 内部辅助方法
@@ -312,7 +372,16 @@ class Files:
         names : List[str], optional
             文件名列表, 若传入则仅验证这些文件, 否则扫描目录下所有符合类型的文件
         records : List[Dict[str, Any]], optional
-            文件元数据列表
+            文件元数据列表, 供 Dataset 内部扫描直接构建注册表, 一般用户无需传入
+
+        Raises
+        ------
+        ValueError
+            目录路径不存在或不是文件夹, 或传入不支持的文件类型时抛出
+
+        Notes
+        -----
+        传入 names 中无效的文件会被跳过并记录警告日志, 不中断初始化
         """
         filetype = Files._check_filetype(type)
         rootpath = Path(root).resolve()
@@ -439,7 +508,34 @@ class Files:
         return new_files
 
     def __getitem__(self, item) -> Self:
-        """支持整数/切片/字符串/字符串列表索引, 返回子文件Files对象"""
+        """
+        支持整数/切片/字符串/字符串列表索引, 返回子文件Files对象
+
+        整数与切片基于文件注册表行序索引, 字符串与字符串列表按文件名精确匹配.
+        返回的子对象继承原对象的目录路径与文件类型等元数据
+
+        Parameters
+        ----------
+        item : int | slice | str | List[str]
+            索引键, 整数与切片按注册表行序, 字符串(列表)按文件名
+
+        Returns
+        -------
+        Self
+            筛选后的子文件Files对象
+
+        Raises
+        ------
+        KeyError
+            字符串(列表)未匹配到任何文件名, 或索引类型不受支持
+
+        Examples
+        --------
+        >>> files[0]
+        >>> files[0:5]
+        >>> files['data1.csv']
+        >>> files[['data1.csv', 'data2.csv']]
+        """
         # 1. 整数与切片索引
         if isinstance(item, (int, slice)):
             # 统一转为列表或切片直接索引
@@ -466,7 +562,24 @@ class Files:
     # --------------------------------------------------------------------------------#
     # 外部用户方法
     def filter(self, pattern: str) -> Self:
-        """使用文件名正则模式筛选数据文件"""
+        r"""
+        使用文件名正则模式筛选数据文件
+
+        Parameters
+        ----------
+        pattern : str
+            正则表达式模式, 匹配不区分大小写
+
+        Returns
+        -------
+        Self
+            筛选后的新Files对象, 原对象保持不变; 无匹配时返回空Files对象
+
+        Examples
+        --------
+        >>> files.filter('case\d+')
+        >>> files.filter('^data_')
+        """
         mask = self._fileTable["name"].str.contains(pattern, case=False, regex=True, na=False)
         return self._new_from_records(self._fileTable[mask])
 
@@ -478,6 +591,16 @@ class Files:
         ----------
         expr : str
             符合 pandas query 语法的表达式
+
+        Returns
+        -------
+        Self
+            筛选后的新Files对象, 原对象保持不变; 无匹配时返回空Files对象
+
+        Raises
+        ------
+        ValueError
+            query 表达式无效时抛出
 
         Examples
         --------
@@ -500,12 +623,17 @@ class Files:
         ascending : bool, default: True
             是否升序
         natural : bool, default: True
-            name 列排序时是否应用自然排序算法
+            name 列排序时是否应用自然排序算法 (如 'file2' 排在 'file10' 之前)
 
         Returns
         -------
         Self
-            排序后的Files对象
+            排序后的当前Files对象, 为就地排序而非新建对象
+
+        Raises
+        ------
+        KeyError
+            by 传入不存在的列名时由 pandas 抛出
         """
 
         def natural_sort_key(s):
@@ -543,11 +671,19 @@ class Files:
             并行读取时的线程数
         usePyarrow : bool, default: False
             是否启用pyarrow加速(需安装pyarrow库)
+        **kwargs
+            读取参数, 透传至对应文件类型的 pandas 读取函数 (如 read_csv 的 sep, header, names 等),
+            与 set_read_params 设置的全局读取参数合并, 同名时以本处传入为准.
+            可用参数参见 preview 方法的 Notes 说明
 
         Returns
         -------
         LoadData
             加载结果. 索引表记录全部数据文件与读取状态, 数据内容以文件名索引, 工况链恒为 '.'
+
+        Notes
+        -----
+        单个文件读取失败或为空不会中断批量加载, 对应条目在索引表中标记为 '失败' 或 '跳过'
         """
         start_time = time()
         logger.info(f"Files加载开始: root={self.rootpath}, count={len(self)}")
@@ -592,13 +728,25 @@ class Files:
     def preview(self, num: int = 1, **kwargs) -> List[pd.DataFrame] | None:
         r"""
         使用指定读取参数, 随机加载数据文件.
+
         方便快速确定合适的读取参数配置
 
         Parameters
         ----------
         num : int, default: 1
             随机加载的文件数量
+        **kwargs
+            读取参数, 透传至对应文件类型的读取函数, 用于试验合适的读取参数配置
 
+        Returns
+        -------
+        List[pd.DataFrame] | None
+            随机加载结果, 无可预览文件时返回 None
+
+        Notes
+        -----
+        常用读取参数一览 (csv/txt 经 pd.read_csv 读取, xlsx 经 pd.read_excel 读取,
+        mat 自动识别一维数组变量为数据列、标量变量为元数据):
         - read_csv:
         ```
         sep: str
@@ -624,11 +772,6 @@ class Files:
         na_values: scalar, str, list-like, or dict
             指定哪些值应识别为 NaN
         ```
-
-        Returns
-        -------
-        List[pd.DataFrame] | None
-            随机加载结果
         """
         start_time = time()
         if len(self) == 0:
@@ -671,19 +814,65 @@ class Files:
 
     @staticmethod
     def show_read_params(filetype: str) -> Dict:
-        """展示指定文件类型的读取参数"""
+        """
+        展示指定文件类型的全局读取参数
+
+        Parameters
+        ----------
+        filetype : str
+            文件类型, 支持: 'csv', 'txt', 'xlsx', 'mat' (可带或不带 '.' 前缀)
+
+        Returns
+        -------
+        Dict
+            当前该类型文件的读取参数字典
+
+        Examples
+        --------
+        >>> Files.show_read_params('csv')
+        """
         return Files._read_params[Files._check_filetype(filetype)]
 
     @staticmethod
     def set_read_params(filetype: str, **kwargs) -> None:
-        """设置指定类型文件的读取参数"""
+        r"""
+        设置指定类型文件的全局读取参数, 对之后所有该类型文件的加载生效
+
+        Parameters
+        ----------
+        filetype : str
+            文件类型, 支持: 'csv', 'txt', 'xlsx', 'mat' (可带或不带 '.' 前缀)
+        **kwargs
+            读取参数, 透传至对应文件类型的 pandas 读取函数, 同名参数覆盖已有配置
+
+        Raises
+        ------
+        ValueError
+            传入不支持的文件类型时抛出
+
+        Examples
+        --------
+        >>> Files.set_read_params('csv', sep='\t', header=None)
+        """
         legal = Files._check_filetype(filetype)
         Files._read_params[legal].update(kwargs)
         logger.info(f"读取参数更新: type={legal}, action=set, params={Files._read_params[legal]}")
 
     @staticmethod
     def clean_read_params(filetype: str) -> None:
-        """清空指定类型文件的读取参数"""
+        """
+        清空指定类型文件的全局读取参数
+
+        Parameters
+        ----------
+        filetype : str
+            文件类型, 支持: 'csv', 'txt', 'xlsx', 'mat' (可带或不带 '.' 前缀)
+
+        Raises
+        ------
+        ValueError
+            传入不支持的文件类型时抛出
+        """
         legal = Files._check_filetype(filetype)
         Files._read_params[legal] = {}
         logger.info(f"读取参数更新: type={legal}, action=clear, params={{}}")
@@ -854,9 +1043,37 @@ class Folder(anytree.Node):
     # --------------------------------------------------------------------------------#
     # Python特性支持
     def __len__(self) -> int:
+        """返回该Folder包含的直接子节点文件夹数量, 不含子节点内部的更深层级"""
         return len(self.children)
 
     def __getitem__(self, item) -> Self | List[Self]:
+        """
+        支持整数/切片/字符串/字符串列表索引, 返回子节点Folder对象
+
+        整数与切片基于子节点列表顺序索引, 字符串按子节点文件夹名精确匹配返回单个节点,
+        字符串列表返回匹配到的节点列表. 多级索引嵌套可实现工况链访问
+
+        Parameters
+        ----------
+        item : int | slice | str | List[str]
+            索引键, 整数与切片按子节点顺序, 字符串(列表)按子节点名称
+
+        Returns
+        -------
+        Self | List[Self]
+            整数/切片/字符串返回单个子节点Folder对象, 字符串列表返回Folder对象列表
+
+        Raises
+        ------
+        KeyError
+            未找到对应名称的子节点, 或索引类型不受支持
+
+        Examples
+        --------
+        >>> dataset['testA']['case1']   # 多级嵌套索引访问工况链
+        >>> dataset[0]
+        >>> dataset[['case1', 'case2']]
+        """
         # 1. 整数与切片索引 (基于子节点列表顺序)
         if isinstance(item, (int, slice)):
             return self.children[item]
@@ -884,7 +1101,15 @@ class Folder(anytree.Node):
 
     @property
     def stats(self) -> Dict:
-        """该Folder当前状态, 包括有效叶子节点数, 数据文件总数, 总大小[MB]"""
+        """
+        该Folder当前状态
+
+        Returns
+        -------
+        Dict
+            包含三个键: valid_node_count 该Folder下挂载数据文件的节点数,
+            file_count 数据文件总数, size_total 总大小[MB]
+        """
         allfiles = self.allfiles
         valid_node_count = len(allfiles)
         file_tables = [files._fileTable for files in allfiles]
@@ -896,7 +1121,14 @@ class Folder(anytree.Node):
     # Files对象管理与加载
     @property
     def files(self) -> Files:
-        """该Folder直接挂载的Files对象"""
+        """
+        该Folder直接挂载的Files对象
+
+        Raises
+        ------
+        AttributeError
+            该文件夹未直接包含数据文件时抛出, 可先调用 info 查看哪些节点发现数据文件
+        """
         if hasattr(self, "_files"):
             return self._files
         else:
@@ -919,7 +1151,17 @@ class Folder(anytree.Node):
     # --------------------------------------------------------------------------------#
     # 外部用户方法
     def info(self) -> None:
-        """打印数据集信息和文件夹结构"""
+        """
+        打印数据集信息和文件夹结构
+
+        输出内容包括: 树状文件夹结构 (★ 标记发现数据文件的节点及其数量,
+        ⦸ 标记未发现数据文件的叶子节点), 有效节点数, 数据文件总数与总大小
+
+        Returns
+        -------
+        None
+            结果直接打印至标准输出
+        """
         if self.is_root:
             print(f"> {self}")
         else:
@@ -967,6 +1209,12 @@ class Folder(anytree.Node):
         -------
         List[Files]
             符合条件的Files对象列表
+
+        Notes
+        -----
+        match 关键词之间为与关系, 需全部匹配; 单个关键词对工况链上任一文件夹名
+        匹配即视为命中. 匹配采用广度优先搜索, 命中节点的下级子节点不再参与匹配,
+        但命中节点内部所有挂载数据文件的子节点均会被纳入 Files 级筛选
         """
         # 1. Folder级匹配筛选
         # 解析搜索关键词
@@ -1150,6 +1398,15 @@ class Dataset(Folder):
             目标文件类型, 支持: '.csv', '.txt', '.xlsx', '.mat'
         name : str, default: ''
             数据集名称
+
+        Raises
+        ------
+        ValueError
+            根目录路径不存在或不是文件夹, 或传入不支持的文件类型时抛出
+
+        Notes
+        -----
+        初始化即全目录扫描, 扫描失败或挂载失败的节点记录警告日志, 不中断整体构建
         """
         # 1. 基础信息处理
         self._rootpath = Path(root).resolve()
@@ -1229,7 +1486,17 @@ class Dataset(Folder):
     # --------------------------------------------------------------------------------#
     # 外部用户接口
     def refresh(self) -> Self:
-        """刷新数据集结构, 重新扫描磁盘目录"""
+        """
+        刷新数据集结构, 重新扫描磁盘目录
+
+        磁盘目录结构变更(新增/删除工况文件夹或数据文件)后调用, 清空现有树结构并重建.
+        set_read_params 设置的全局读取参数不受影响
+
+        Returns
+        -------
+        Self
+            重新扫描后的当前Dataset对象
+        """
         start_time = time()
         logger.info(f"Dataset刷新开始: root={self._rootpath}")
         # 清空现有子节点
