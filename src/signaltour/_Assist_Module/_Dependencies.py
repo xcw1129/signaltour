@@ -8,6 +8,7 @@ import logging  # 日志记录打印
 from pathlib import Path  # 文件路径封装
 from typing import (
     Dict,
+    Iterator,
     List,
     Tuple,
     Set,
