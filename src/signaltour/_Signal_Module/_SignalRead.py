@@ -114,9 +114,15 @@ class LoadData:
         """
         支持二元组与字符串索引
 
-        二元组 (工况链, 文件名) 返回单个数据内容, 合并后文件名为空串
+        二元组 (工况链, 文件名) 返回单个数据内容, 其中合并后文件名恒为空串
 
-        字符串 (工况链) 合并前返回子工况链LoadData对象, 合并后返回该工况链的合并结果
+        字符串视为索引表的 pandas query 表达式, 筛选后返回子LoadData对象, 无匹配时返回空对象
+
+        Examples
+        --------
+        >>> loaddata["chain == 'testA/case1'"]
+        >>> loaddata["status == '失败'"]
+        >>> loaddata["`size[MB]` > 1.0"]
         """
         # 1. 二元组索引 (工况链, 文件名)
         if isinstance(item, tuple) and len(item) == 2:
@@ -125,22 +131,21 @@ class LoadData:
             else:
                 raise KeyError(f"key={item}: 未找到对应的数据内容, 可检查table中的读取状态")
         # ------------------------------------------------------------------------#
-        # 2. 字符串索引 (工况链)
+        # 2. 字符串索引 (索引表query表达式)
         elif isinstance(item, str):
-            if self._isMerged:
-                # 已合并: 工况链与合并结果一一对应
-                if (item, "") in self._payload:
-                    return self._payload[(item, "")]
-                else:
-                    raise KeyError(f"key={item}: 未找到对应的合并结果, 可检查table中的读取状态")
-            mask = self._table["chain"] == item
-            if mask.any():
-                payload = {(chain, name): df for (chain, name), df in self._payload.items() if chain == item}
-                return type(self)(self._table[mask].reset_index(drop=True), payload)
-            else:
-                raise KeyError(f"key={item}: 未找到对应的工况链")
+            try:
+                table: pd.DataFrame = self._table.query(item)
+            except Exception as error:
+                raise ValueError(f"query={item}: 索引表达式无效, {error}") from error
+            names = [""] * len(table) if self._isMerged else table["name"].tolist()
+            payload = {
+                (chain, name): self._payload[(chain, name)]
+                for chain, name in zip(table["chain"], names)
+                if (chain, name) in self._payload
+            }
+            return type(self)(table.reset_index(drop=True), payload)
         else:
-            raise KeyError("LoadData 索引仅支持字符串(工况链)和二元组(工况链, 文件名)")
+            raise KeyError("LoadData 索引仅支持字符串(query表达式)和二元组(工况链, 文件名)")
 
     def __repr__(self) -> str:
         return f"LoadData(chains={len(self.chains)}, rows={len(self)}, loaded={len(self._payload)})"
@@ -208,7 +213,7 @@ class LoadData:
         return self
 
     # --------------------------------------------------------------------------------#
-    # 合并内部方法
+    # 内部辅助方法
     @property
     def _isMerged(self) -> bool:
         """索引表是否已完成合并, 已合并的索引表不含 name 列"""
@@ -229,8 +234,6 @@ class LoadData:
             filesdata = pd.concat([df for _, df in entries], axis=0, ignore_index=True)
         return filesdata.to_frame() if isinstance(filesdata, pd.Series) else filesdata
 
-    # --------------------------------------------------------------------------------#
-    # 内部构建方法
     @classmethod
     def _empty(cls) -> Self:
         """构建空LoadData对象, 用于无任何数据文件的场景"""
