@@ -5,6 +5,7 @@
 #     "matplotlib==3.11.2",
 #     "numpy==2.5.3",
 #     "pandas==3.0.5",
+#     "pyarrow==25.0.1",
 #     "python-lsp-ruff==2.3.4",
 #     "python-lsp-server==1.15.0",
 #     "scipy==1.18.1",
@@ -35,7 +36,7 @@ with app.setup:
     logger.propagate = False
     logger.handlers.clear()
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: \n\t%(message)s"))
     logger.addHandler(handler)
 
     import signaltour as st
@@ -57,6 +58,14 @@ def _():
     return
 
 
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    - .mat类型数据文件
+    """)
+    return
+
+
 @app.cell
 def _():
     dataset = st.Dataset(
@@ -70,29 +79,54 @@ def _():
 
 @app.cell
 def _(dataset):
-    datafolder: st.Folder = dataset["12k Drive End Bearing Fault Data"]
-    datafolder.files
+    datafolder = dataset["12k Drive End Bearing Fault Data"]
+    data=datafolder.loadMatch(match="0007",filter="_0",merge=False)
+    data.table
+    return data, datafolder
+
+
+@app.cell
+def _(data):
+    data["chain.str.contains('Outer Race')"].table
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    - .csv类型数据文件
+    """)
     return
 
 
 @app.cell
-def _(df):
-    sig = st.Signal(
-        axis=st.t_Axis(N=len(df), fs=12000),
-        data=df["OR007@6_0#X130_DE_time"],
-        name="加速度",
-        unit="$g$",
-        label="驱动端振动信号",
-    )
-    sig.plot()
-    mo.vstack([plt.gcf()], align="center")
-    return (sig,)
+def _():
+    dataset_csv=st.Dataset(root=r"F:\OneDrive\Database\学术公开数据集\寿命预测\XJTU_轴承加速退化振动数据集\Data",type='.csv')
+    dataset_csv.info()
+    return (dataset_csv,)
 
 
 @app.cell
-def _(sig):
-    sig["2s":"2.2s"].plot()
-    mo.vstack([plt.gcf()], align="center")
+def _(datafolder, dataset_csv):
+    datafolder_csv=dataset_csv['35Hz12kN']
+    datafolder.stats
+    return (datafolder_csv,)
+
+
+@app.cell
+def _(datafolder_csv):
+    data_csv=datafolder_csv.loadAll(isParallel=True,parallelNum=10,usePyarrow=True).merge('vstack')
+    data_csv.table
+    return (data_csv,)
+
+
+@app.cell
+def _(data_csv):
+    _Listfig=[]
+    for _sig in data_csv.to_Signal(fs=35000,name='加速度'):
+        _sig.plot()
+        _Listfig.append(plt.gcf())
+    mo.vstack(_Listfig,align='center')
     return
 
 
@@ -101,6 +135,16 @@ def _():
     mo.md(r"""
     ## 2. 信号预处理
     """)
+    return
+
+
+@app.cell
+def _(Listsig):
+    _Listfig=[]
+    for _sig in Listsig:
+        _sig.plot()
+        _Listfig.append(plt.gcf())
+    mo.vstack(_Listfig,align='center')
     return
 
 
