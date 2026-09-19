@@ -68,26 +68,30 @@ def _():
 
 @app.cell
 def _():
-    dataset = st.Dataset(
+    dataset_mat = st.Dataset(
         root=r"F:\OneDrive\Database\学术公开数据集\故障诊断\CWRU_轴承故障振动数据集\Data",
         type=".mat",
         name="CWRU故障轴承振动数据集",
     )
-    dataset.info()
-    return (dataset,)
+    dataset_mat.info()
+    return (dataset_mat,)
 
 
 @app.cell
-def _(dataset):
-    datafolder = dataset["12k Drive End Bearing Fault Data"]
-    data=datafolder.loadMatch(match="0007",filter="_0",merge=False)
-    data.table
-    return data, datafolder
+def _(dataset_mat):
+    datafolder_mat = dataset_mat["12k Drive End Bearing Fault Data"]
+    data_mat=datafolder_mat.loadMatch(match="0021",filter="_0")
+    data_mat.table
+    return (data_mat,)
 
 
 @app.cell
-def _(data):
-    data["chain.str.contains('Outer Race')"].table
+def _(data_mat):
+    _Listfig=[]
+    for _sig in data_mat.to_Signal(fs=12000,name='加速度',unit='$m/s^2$'):
+        _sig.plot()
+        _Listfig.append(plt.gcf())
+    mo.vstack(_Listfig,align='center')
     return
 
 
@@ -107,9 +111,9 @@ def _():
 
 
 @app.cell
-def _(datafolder, dataset_csv):
+def _(dataset_csv):
     datafolder_csv=dataset_csv['35Hz12kN']
-    datafolder.stats
+    datafolder_csv.stats
     return (datafolder_csv,)
 
 
@@ -123,7 +127,7 @@ def _(datafolder_csv):
 @app.cell
 def _(data_csv):
     _Listfig=[]
-    for _sig in data_csv.to_Signal(fs=35000,name='加速度'):
+    for _sig in data_csv.to_Signal(fs=35000,name='加速度',unit='$m/s^2$'):
         _sig.plot()
         _Listfig.append(plt.gcf())
     mo.vstack(_Listfig,align='center')
@@ -135,16 +139,6 @@ def _():
     mo.md(r"""
     ## 2. 信号预处理
     """)
-    return
-
-
-@app.cell
-def _(Listsig):
-    _Listfig=[]
-    for _sig in Listsig:
-        _sig.plot()
-        _Listfig.append(plt.gcf())
-    mo.vstack(_Listfig,align='center')
     return
 
 
