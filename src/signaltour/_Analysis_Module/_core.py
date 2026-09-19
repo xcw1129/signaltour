@@ -9,7 +9,6 @@ __all__ = ["BaseAnalysis"]
 
 from .._Assist_Module._Dependencies import (
     Callable,
-    Optional,
     ParamSpec,
     TypeVar,
     wraps,

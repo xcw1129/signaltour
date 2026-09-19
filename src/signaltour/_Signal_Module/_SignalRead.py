@@ -243,7 +243,7 @@ class LoadData:
         logger.info(f"合并完成: mode={mode}, chains={len(rows)}, files={source_count}, elapsed={consumed_time:.2f}s")
         return self
 
-    def to_Signal(self, fs: float, name: str) -> List["Signal"]:
+    def to_Signal(self, fs: float, name: str, unit: str) -> List["Signal"]:
         """
         将所有加载数据(每列)转换为Signal对象
 
@@ -256,7 +256,9 @@ class LoadData:
         fs : float
             数据采样频率
         name : str
-            数据类型名称, 同时作为生成的Signal对象名称
+            数据类型名称
+        unit : str
+            数据物理单位
 
         Returns
         -------
@@ -264,11 +266,13 @@ class LoadData:
             转换的Signal对象列表, 顺序与索引表一致, 不含被跳过的空数据条目
         """
         Listsig: List[Signal] = []
-        for chain, name, df in self:
+        for c, n, df in self:
             if df is not None and not df.empty:
                 for col in df.columns:
                     data = np.asarray(df[col].dropna(), copy=True)
-                    sig = Signal(axis=t_Axis(fs=fs, N=len(data)), data=data, name=name, label=f"{chain}#{name}#{col}")
+                    sig = Signal(
+                        axis=t_Axis(fs=fs, N=len(data)), data=data, name=name, unit=unit, label=f"{c}#{n}#{col}"
+                    )
                     Listsig.append(sig)
         return Listsig
 
