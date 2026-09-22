@@ -45,7 +45,7 @@ def periodic(fs: float, T: float, CosParams: tuple, noise: float = 0.0) -> Signa
     Raises
     ------
     ValueError
-        CosParams参数格式错误（每组需为3元组）
+        CosParams参数格式错误(每组需为3元组)
     """
     Sig = Signal(axis=t_Axis(int(np.ceil(T * fs)), fs=fs), label="仿真含噪准周期信号")
     for i, params in enumerate(CosParams):
@@ -64,12 +64,12 @@ def impulse(fs: float, T: float, ImpParams: tuple, noiseParams: Optional[tuple] 
     Parameters
     ----------
     fs : float
-        采样频率, 单位Hz, 输入范围: >0
+        采样频率, 单位Hz
     T : float
-        信号时长, 单位s, 输入范围: >0
+        信号时长, 单位s
     ImpParams : tuple
-        冲击序列生成参数, 格式为(fc, fe, alpha, A, tau)
-        分别为中心频率、出现频率、滑移百分比、冲击幅值（常数、数组或函数）和幅值衰减时间
+        冲击序列生成参数, 格式为(fc, fe, alpha, A, tau).
+        分别为中心频率、出现频率、滑移百分比(0-1)、冲击幅值(常数、数组或函数)和幅值衰减时间
     noiseParams : tuple, optional
         噪声冲击参数, 格式为(n, la), 分别为噪声冲击个数和幅值指数分布参数
 
@@ -78,34 +78,34 @@ def impulse(fs: float, T: float, ImpParams: tuple, noiseParams: Optional[tuple] 
     Signal
         仿真冲击信号
     """
-    Sig = Signal(axis=t_Axis(int(np.ceil(T * fs)), fs=fs), label="仿真冲击信号")
+    Sig = Signal(axis=t_Axis(T=T, fs=fs), label="仿真冲击信号")
     N = len(Sig)
     t = Sig.t_axis()
     # 准备冲击序列参数
     if len(ImpParams) != 5:
-        raise ValueError("ImpParams参数格式错误")
+        raise ValueError(f"ImpParams={ImpParams}: 冲击序列生成参数格式错误")
     fc, fe, alpha, A, tau = ImpParams
     idx_gap = fs / fe  # 平均冲击间隔
+    idx_sliding = int(alpha * idx_gap)  # 冲击位置滑移范围
     imp_idx = np.arange(0, N, idx_gap)  # 冲击位置索引数组
     C = -np.log(0.05) / tau**2  # 衰减常数
-    impulse = np.exp(-C * t[: int(tau * fs)] ** 2) * np.sin(2 * np.pi * fc * t[: int(tau * fs)])  # 单个冲击波形
+    imp_wave = np.exp(-C * t[: int(tau * fs)] ** 2) * np.sin(2 * np.pi * fc * t[: int(tau * fs)])  # 单个冲击波形
     A_array = A(t) if isinstance(A, Callable) else A if isinstance(A, np.ndarray) else np.full(N, A)  # 冲击幅值数组
     # 生成冲击信号
     for idx in imp_idx:
         idx = int(idx)
-        idx_sliding = int(alpha * idx_gap)
         idx += np.random.randint(-idx_sliding, idx_sliding + 1)  # 冲击位置滑移
         idx1 = max(0, idx)  # 实际脉冲起始索引
-        idx2 = min(N, idx1 + len(impulse))  # 实际脉冲结束索引
+        idx2 = min(N, idx + len(imp_wave))  # 实际脉冲结束索引
         if idx2 > idx1:
-            Sig._data[idx1:idx2] += impulse[idx1 - idx : idx2 - idx] * A_array[idx1]  # 单个冲击幅值不变
+            Sig._data[idx1:idx2] += imp_wave[idx1 - idx : idx2 - idx] * A_array[idx1]  # 单个冲击幅值不变
     # 加入噪声冲击
     if noiseParams is not None:
         n, la = noiseParams
-        noise_idx = np.random.randint(0, N, n)
+        noise_idx = np.random.choice(N, size=n, replace=False)  # 随机选择噪声冲击位置索引
         noise_amplitudes = np.random.exponential(scale=la, size=n)  # la越大, 噪声冲击幅值越大
-        for i, idx in enumerate(noise_idx):
-            Sig[idx] += noise_amplitudes[i]
+        noise_imp_wave = np.bincount(noise_idx, weights=noise_amplitudes, minlength=N)
+        Sig._data += noise_imp_wave
     return Sig
 
 
@@ -116,11 +116,11 @@ def modulation(fs: float, T: float, fc: float, AM: Callable, FM: Callable) -> Si
     Parameters
     ----------
     fs : float
-        采样频率, 单位Hz, 输入范围: >0
+        采样频率, 单位Hz
     T : float
-        信号时长, 单位s, 输入范围: >0
+        信号时长, 单位s
     fc : float
-        载波频率, 单位Hz, 输入范围: >0
+        载波频率, 单位Hz
     AM : callable
         调幅函数, 接受时间轴数组作为输入, 返回调幅系数数组
     FM : callable
@@ -131,7 +131,7 @@ def modulation(fs: float, T: float, fc: float, AM: Callable, FM: Callable) -> Si
     Signal
         生成的仿真信号
     """
-    Sig = Signal(axis=t_Axis(int(np.ceil(T * fs)), fs=fs), label="仿真调制信号")
+    Sig = Signal(axis=t_Axis(T=T, fs=fs), label="仿真调制信号")
     t = Sig.t_axis()
     # 生成调制相位
     phase = 2 * np.pi * fc * t + 2 * np.pi * np.cumsum(FM(t)) / fs
