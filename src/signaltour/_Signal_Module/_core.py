@@ -372,32 +372,32 @@ class Series(NDArrayOperatorsMixin):
             return res
 
     # 底层运算函数兼容
-    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+    def __array_ufunc__(self, ufunc, method, *args, **kwargs):
         # ------------------------------------------------------------------------#
-        # 支持out参数：将out中的Series对象替换为其_data属性便于in-place修改
+        # 支持out参数：就地运算中numpy会自动使用
         out = kwargs.get("out", None)
         if out is not None:
             new_out = []
             for o in out:
                 if isinstance(o, Series):
-                    new_out.append(o._data)  # 输入._data原始变量
+                    new_out.append(o._data)  # 将out中的Series对象替换为其_data属性便于in-place修改
                 else:
                     new_out.append(o)
             kwargs = dict(kwargs)
             kwargs["out"] = tuple(new_out)
         # ------------------------------------------------------------------------#
         # 将输入中的Series对象转为array以便ufunc处理
-        args = [x._data if isinstance(x, Series) else x for x in inputs]
+        args_ = [x._data if isinstance(x, Series) else x for x in args]
         # 根据method调用相应的ufunc方法
         if method == "at":  # 处理就地操作（如add.at等，不支持）
             return NotImplemented
         if (
             method == "reduce" or method == "reduceat" or method == "outer"
         ):  # 处理非逐元素操作（如add.reduce等，极少使用）
-            res = getattr(ufunc, method)(*args, **kwargs)
+            res = getattr(ufunc, method)(*args_, **kwargs)
             return res
         elif method == "__call__" or method == "accumulate":  # 处理逐元素运算（如abs、multiply等，常用）
-            res = getattr(ufunc, method)(*args, **kwargs)
+            res = getattr(ufunc, method)(*args_, **kwargs)
             # 如果指定了out参数, 则直接返回out
             if out is not None:
                 return out if len(out) > 1 else out[0]
