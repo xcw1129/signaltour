@@ -8,7 +8,11 @@
 
 __all__ = ["CWTAnalysis", "DWTAnalysis"]
 
-from .._Assist_Module._Dependencies import Dict, List, Optional, fft, linalg, np, signal
+from typing import Dict, List, Optional
+
+import numpy as np
+from scipy import fft, linalg, signal
+
 from .._Plot_Module._ImagePlot import spectrogram_PlotFunc
 from .._Plot_Module._LinePlot import LinePlot
 from .._Signal_Module._core import Signal, t_Axis

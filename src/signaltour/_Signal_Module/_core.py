@@ -12,16 +12,13 @@
 
 __all__ = ["Axis", "Series", "t_Axis", "f_Axis", "Signal", "Spectra"]
 
-from .._Assist_Module._Dependencies import (
-    NDArrayOperatorsMixin,
-    Optional,
-    Self,
-    Tuple,
-    deepcopy,
-    np,
-    numbers,
-    re,
-)
+import numbers
+import re
+from copy import deepcopy
+from typing import Optional, Self, Tuple
+
+import numpy as np
+from numpy.lib.mixins import NDArrayOperatorsMixin
 
 
 # --------------------------------------------------------------------------------------------#

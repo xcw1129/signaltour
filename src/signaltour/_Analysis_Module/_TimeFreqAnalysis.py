@@ -8,7 +8,11 @@
 
 __all__ = ["STFTAnalysis", "WVDAnalysis"]
 
-from .._Assist_Module._Dependencies import Optional, Tuple, fft, np, signal
+from typing import Optional, Tuple
+
+import numpy as np
+from scipy import fft, signal
+
 from .._Plot_Module._ImagePlot import spectrogram_PlotFunc
 from .._Signal_Module._core import Signal
 from .._Signal_Module._SignalSample import slice

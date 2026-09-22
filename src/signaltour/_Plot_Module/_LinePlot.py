@@ -16,7 +16,10 @@ __all__ = [
     "PlotFunc_decResult",
 ]
 
-from .._Assist_Module._Dependencies import List, Optional, Self, np
+from typing import List, Optional, Self
+
+import numpy as np
+
 from .._Signal_Module._core import Series, Signal, Spectra
 from ._core import BasePlot
 from ._PlotPlugin import PeakfinderPlugin, PosNagMaskPlugin

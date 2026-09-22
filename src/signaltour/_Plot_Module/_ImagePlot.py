@@ -9,7 +9,10 @@
 
 __all__ = ["ImagePlot", "spectrogram_PlotFunc"]
 
-from .._Assist_Module._Dependencies import Optional, np
+from typing import Optional
+
+import numpy as np
+
 from ._core import BasePlot
 
 

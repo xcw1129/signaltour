@@ -22,7 +22,11 @@ __all__ = [
     "VMDAnalysis",
 ]
 
-from .._Assist_Module._Dependencies import Optional, fft, interpolate, np, signal
+from typing import Optional
+
+import numpy as np
+from scipy import fft, interpolate, signal
+
 from .._Plot_Module._LinePlot import LinePlot, PlotFunc_decResult, PlotFunc_waveform
 from .._Signal_Module._core import Signal, Spectra, f_Axis
 from .._Signal_Module._SignalSample import pad
@@ -563,9 +567,6 @@ class VMDAnalysis(BaseAnalysis):
         模态初始中心频率的初始化策略, 输入范围: "uniform", "log", "octave", "linearrandom", "lograndom"
     getTrend_method : str
         趋势模态提取方法, 输入范围: "滑动平均"
-
-    Methods
-    -------
     """
 
     def __init__(
@@ -649,7 +650,7 @@ class VMDAnalysis(BaseAnalysis):
         analytic = signal.hilbert(Sig_extend)
         X_k = fft.fft(analytic) / len(Sig_extend)  # 延拓信号解析频谱
         Spc_extend = Spectra(
-            Sig_extend.f_axis,
+            Sig_extend.t_axis.to_f_axis(),
             X_k,
             name=self.Sig.name,
             unit=self.Sig.unit,
@@ -658,7 +659,7 @@ class VMDAnalysis(BaseAnalysis):
         # 初始化优化变量
         Spc_mode_list = [
             Spectra(
-                Sig_extend.f_axis,
+                Sig_extend.t_axis.to_f_axis(),
                 name=self.Sig.name,
                 unit=self.Sig.unit,
                 label=f"模态-{i + 1}: 0",
@@ -666,7 +667,7 @@ class VMDAnalysis(BaseAnalysis):
             for i in range(decNum)
         ]
         Spc_lambda = Spectra(
-            Sig_extend.f_axis,
+            Sig_extend.t_axis.to_f_axis(),
             name=self.Sig.name,
             unit=self.Sig.unit,
             label="拉格朗日乘子",
@@ -674,7 +675,7 @@ class VMDAnalysis(BaseAnalysis):
         # ------------------------------------------------------------------------#
         # 优化超参数初始化
         # 各分类中心角频率初始化
-        omega_list = self.init_modeFc(Sig_extend.f_axis, decNum, method=self.initFc_method) * 2 * np.pi
+        omega_list = self.init_modeFc(Sig_extend.t_axis.to_f_axis(), decNum, method=self.initFc_method) * 2 * np.pi
         # 变分约束惩罚因子，由等效带宽bw计算得到
         alpha = (10 ** (3 / 20) - 1) / (2 * (np.pi * bw) ** 2)
         alpha_list = alpha * np.ones(decNum)  # 初始各模态惩罚因子相等
@@ -686,7 +687,7 @@ class VMDAnalysis(BaseAnalysis):
             X_k_trend[1:] = X_k_trend[1:] * 2
             X_k_trend[len(Sig_extend) // 2 :] = 0
             Spc_trend = Spectra(
-                Sig_extend.f_axis,
+                Sig_extend.t_axis.to_f_axis(),
                 X_k_trend,
                 name=self.Sig.name,
                 unit=self.Sig.unit,

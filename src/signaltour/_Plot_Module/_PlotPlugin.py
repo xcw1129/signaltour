@@ -8,7 +8,10 @@
 
 __all__ = ["PeakfinderPlugin", "PosNagMaskPlugin"]
 
-from .._Assist_Module._Dependencies import Dict, plt
+from typing import Dict
+
+import matplotlib.pyplot as plt
+
 from ._core import PlotPlugin
 
 # --------------------------------------------------------------------------------------------#

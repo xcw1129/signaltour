@@ -9,7 +9,10 @@
 
 __all__ = ["resample", "pad", "slice"]
 
-from .._Assist_Module._Dependencies import Optional, np
+from typing import Optional
+
+import numpy as np
+
 from ._core import Signal, t_Axis
 
 

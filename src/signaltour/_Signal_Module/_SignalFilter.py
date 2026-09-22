@@ -9,7 +9,10 @@
 
 __all__ = ["filtFIR", "filtIIR", "filtMedian"]
 
-from .._Assist_Module._Dependencies import Tuple, signal
+from typing import Tuple
+
+from scipy import signal
+
 from ._core import Signal
 
 

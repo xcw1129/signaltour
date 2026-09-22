@@ -7,12 +7,10 @@
 
 __all__ = ["BaseAnalysis"]
 
-from .._Assist_Module._Dependencies import (
-    Callable,
-    ParamSpec,
-    TypeVar,
-    wraps,
-)
+from collections.abc import Callable
+from functools import wraps
+from typing import ParamSpec, TypeVar
+
 from .._Signal_Module._core import Signal
 
 _P = ParamSpec("_P")

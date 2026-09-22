@@ -10,30 +10,21 @@
 
 __all__ = ["LoadData", "Files", "Folder", "Dataset"]
 
-from .._Assist_Module._Dependencies import (
-    Any,
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Literal,
-    Optional,
-    Path,
-    Self,
-    ThreadPoolExecutor,
-    Tuple,
-    TypeAlias,
-    anytree,
-    loadmat,
-    logging,
-    np,
-    os,
-    pd,
-    random,
-    re,
-    time,
-    util,
-)
+import logging
+import os
+import random
+import re
+from concurrent.futures import ThreadPoolExecutor
+from importlib import util
+from pathlib import Path
+from time import time
+from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Self, Tuple, TypeAlias
+
+import anytree
+import numpy as np
+import pandas as pd
+from scipy.io import loadmat
+
 from ._core import Signal, t_Axis
 
 # 初始化日志记录器

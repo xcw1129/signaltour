@@ -8,19 +8,16 @@
 
 __all__ = ["BasePlot", "PlotPlugin"]
 
-from .._Assist_Module._Dependencies import (
-    Optional,
-    Self,
-    cycler,
-    deque,
-    font_manager,
-    logging,
-    np,
-    os,
-    plt,
-    shallowcopy,
-    ticker,
-)
+import logging
+import os
+from collections import deque
+from copy import copy as shallowcopy
+from typing import Optional, Self
+
+import matplotlib.pyplot as plt
+import numpy as np
+from cycler import cycler
+from matplotlib import font_manager, ticker
 
 # 初始化日志记录器
 logger = logging.getLogger(__name__)
