@@ -4,7 +4,7 @@
     - function:
         - `periodic`: 生成仿真含噪准周期信号
         - `impulse`: 生成仿真冲击序列和噪声冲击复合信号
-        - `modulation`: 生成仿真含噪调制信号
+        - `modulation`: 生成仿真频率-幅值调制信号
 """
 
 __all__ = ["periodic", "impulse", "modulation"]
@@ -28,31 +28,26 @@ def periodic(fs: float, T: float, CosParams: tuple, noise: float = 0.0) -> Signa
     Parameters
     ----------
     fs : float
-        采样频率, 单位Hz, 输入范围: >0
+        采样频率, 单位Hz
     T : float
-        信号时长, 单位s, 输入范围: >0
+        信号时长, 单位s
     CosParams : tuple
-        多组余弦信号参数, 每组为(f, A, phi), 分别为频率、幅值、初相位。
-        例如：((f1, A1, phi1), (f2, A2, phi2), ...)
-    noise : float, 可选
-        高斯白噪声标准差, 默认0.0, 输入范围: >=0
+        余弦成分生成参数, 格式为((f, A, phi), ...), 分别为频率、幅值、初相位
+    noise : float, default=0.0
+        高斯白噪声标准差
 
     Returns
     -------
     Signal
-        生成的仿真信号
-
-    Raises
-    ------
-    ValueError
-        CosParams参数格式错误(每组需为3元组)
+        仿真周期信号
     """
-    Sig = Signal(axis=t_Axis(int(np.ceil(T * fs)), fs=fs), label="仿真含噪准周期信号")
+    Sig = Signal(axis=t_Axis(T=T, fs=fs), label="仿真周期信号")
+    time = Sig.t_axis()
     for i, params in enumerate(CosParams):
         if len(params) != 3:
-            raise ValueError(f"CosParams参数中, 第{i + 1}组余弦系数格式错误")
+            raise ValueError(f"CosParams={params}: 余弦成分生成参数格式错误")
         f, A, phi = params
-        Sig += A * np.cos(2 * np.pi * f * Sig.t_axis() + phi)  # 生成任意频率、幅值、初相位的余弦信号
+        Sig += A * np.cos(2 * np.pi * f * time + phi)  # 生成任意频率、幅值、初相位的余弦信号
     Sig += np.random.randn(len(Sig)) * noise  # 加入高斯白噪声
     return Sig
 
@@ -111,7 +106,7 @@ def impulse(fs: float, T: float, ImpParams: tuple, noiseParams: Optional[tuple] 
 
 def modulation(fs: float, T: float, fc: float, AM: Callable, FM: Callable) -> Signal:
     """
-    生成仿真含噪调制信号
+    生成仿真频率-幅值调制信号
 
     Parameters
     ----------
@@ -129,7 +124,7 @@ def modulation(fs: float, T: float, fc: float, AM: Callable, FM: Callable) -> Si
     Returns
     -------
     Signal
-        生成的仿真信号
+        仿真调制信号
     """
     Sig = Signal(axis=t_Axis(T=T, fs=fs), label="仿真调制信号")
     t = Sig.t_axis()
