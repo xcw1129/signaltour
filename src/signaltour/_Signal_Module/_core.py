@@ -260,7 +260,7 @@ class Series(NDArrayOperatorsMixin):
             序列数据标签
         """
         # Series类核心维护参数
-        self._axis: Axis = axis.copy()  # _axis优先级高于_data
+        self._axis: Axis = axis.copy()
         self.name: str = name
         self.unit: str = unit
         self.label: str = label
@@ -270,7 +270,7 @@ class Series(NDArrayOperatorsMixin):
         if self._check_data(self._data) is False:
             raise ValueError(f"data={self._data}: 输入序列数据数组非法. 避免使用非一维数组, 长度不匹配或包含NaN值")
 
-    _COPY_ARRAY = None  # 默认不复制, 若numpy判定复制不可避免则仍然复制
+    _COPY_ARRAY = True
 
     # --------------------------------------------------------------------------------#
     # 动态可读属性
@@ -389,14 +389,14 @@ class Series(NDArrayOperatorsMixin):
         # 将输入中的Series对象转为array以便ufunc处理
         args_ = [x._data if isinstance(x, Series) else x for x in args]
         # 根据method调用相应的ufunc方法
-        if method == "at":  # 处理就地操作（如add.at等，不支持）
+        if method == "at":  # 处理就地操作(如add.at等，不支持)
             return NotImplemented
         if (
             method == "reduce" or method == "reduceat" or method == "outer"
-        ):  # 处理非逐元素操作（如add.reduce等，极少使用）
+        ):  # 处理非逐元素操作(如add.reduce等，极少使用)
             res = getattr(ufunc, method)(*args_, **kwargs)
             return res
-        elif method == "__call__" or method == "accumulate":  # 处理逐元素运算（如abs、multiply等，常用）
+        elif method == "__call__" or method == "accumulate":  # 处理逐元素运算(如abs、multiply等，常用)
             res = getattr(ufunc, method)(*args_, **kwargs)
             # 如果指定了out参数, 则直接返回out
             if out is not None:
@@ -833,11 +833,10 @@ class Spectra(Series):
         if self.f_axis.f0 != 0.0:
             raise ValueError(f"f0={self.f_axis.f0}: 当前谱频率轴不完整, 无法进行单边谱裁剪")
         N = len(self)
-        if N % 2 == 0:  # 偶数点，非对称
-            half_N = N // 2
-        else:  # 奇数点，对称
-            half_N = (N + 1) // 2  # 包含fn频率点, 但幅值一般为0
-
+        if N % 2 == 0:
+            half_N = N // 2 + 1  # 包含fn频率点, 但幅值一般为0
+        else:
+            half_N = (N + 1) // 2
         self._axis, self._data = (
             self._axis[:half_N],
             self._data[:half_N],

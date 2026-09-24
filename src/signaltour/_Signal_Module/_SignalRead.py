@@ -753,7 +753,7 @@ class Files:
         index_col: int, str, or None
             指定作为行索引的列
         usecols: list
-            仅读取指定的列（索引或名称），可大幅减少内存占用
+            仅读取指定的列(索引或名称)，可大幅减少内存占用
         skiprows: int or list
             跳过文件开头的若干行或指定的行号
         skipfooter: int

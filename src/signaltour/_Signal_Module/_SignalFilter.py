@@ -2,9 +2,9 @@
 # SignalFilter: 信号滤波模块, 提供FIR/IIR滤波器与中值滤波等去噪方法
 
     - function:
-        - `filtFIR`: 基于有限冲击响应滤波器对信号进行各种类型滤波
-        - `filtIIR`: 基于无限冲击响应滤波器对信号进行各种类型滤波
-        - `filtMedian`: 基于中值滤波器对信号进行去噪处理
+        - `filtFIR`: 基于有限冲击响应滤波器对信号进行卷积滑窗滤波
+        - `filtIIR`: 基于无限冲击响应滤波器对信号进行反馈递归滤波
+        - `filtMedian`: 基于中值滤波器对信号进行卷积滑窗滤波
 """
 
 __all__ = ["filtFIR", "filtIIR", "filtMedian"]
@@ -25,7 +25,7 @@ def filtFIR(
     zero_phase: bool = False,
 ) -> Signal:
     """
-    基于有限冲击响应滤波器对信号进行各种类型滤波
+    基于有限冲击响应滤波器对信号进行卷积滑窗滤波
 
     Parameters
     ----------
@@ -33,29 +33,23 @@ def filtFIR(
         待滤波信号
     cutoff : float or tuple[float, float]
         截止频率(Hz), band 类型需提供两个元素
-    order : int, default: 128
+    order : int, default=128
         滤波器阶数
-    btype : str, default: "lowpass"
+    btype : str, default="lowpass"
         滤波器类型，支持: "lowpass", "highpass", "bandpass", "bandstop"
-    window : str, default: "hamming"
+    window : str, default="hamming"
         理想滤波器加窗类型
-    zero_phase : bool, default: False
+    zero_phase : bool, default=False
         是否进行零相移滤波
 
     Returns
     -------
     Signal
-        滤波后的信号, 采样信息与输入信号一致
-
-    See Also
-    --------
-    - scipy.signal.firwin: FIR滤波器系数生成
-    - scipy.signal.lfilter: 一般单向滤波计算
-    - scipy.signal.filtfilt: 零相位滤波计算
+        滤波后信号
     """
     fs = Sig.t_axis.fs
     b = signal.firwin(
-        numtaps=order + 1,
+        numtaps=order,
         cutoff=cutoff,
         window=window,
         pass_zero=btype,
@@ -74,7 +68,7 @@ def filtIIR(
     zero_phase: bool = False,
 ) -> Signal:
     """
-    基于无限冲击响应滤波器对信号进行各种类型滤波
+    基于无限冲击响应滤波器对信号进行反馈递归滤波
 
     滤波器具体实现通过级联二阶节sos形式, 以提高滤波器的数值稳定性
 
@@ -83,26 +77,20 @@ def filtIIR(
     Sig : Signal
         待滤波信号
     cutoff : float or tuple[float, float]
-        截止频率（Hz），band 类型需提供两个元素
-    order : int, default: 4
+        截止频率(Hz)，band 类型需提供两个元素
+    order : int, default=4
         滤波器阶数
-    btype : str, default: "lowpass"
+    btype : str, default="lowpass"
         滤波器类型，支持: "lowpass", "highpass", "bandpass", "bandstop"
-    ftype : str, default: "butter"
+    ftype : str, default="butter"
         滤波器子类型，支持: "butter", "cheby1", "ellip"
-    zero_phase : bool, default: False
+    zero_phase : bool, default=False
         是否进行零相位滤波
 
     Returns
     -------
     Signal
-        滤波后的信号, 采样信息与输入信号一致
-
-    See Also
-    --------
-    - scipy.signal.iirfilter: IIR滤波器系数生成
-    - scipy.signal.sosfilt: 一般单向滤波计算
-    - scipy.signal.sosfiltfilt: 零相位滤波计算
+        滤波后信号
 
     Notes
     -----
@@ -120,23 +108,19 @@ def filtMedian(
     size: int = 5,
 ) -> Signal:
     """
-    基于中值滤波器对信号进行去噪处理
+    基于中值滤波器对信号进行卷积滑窗滤波
 
     Parameters
     ----------
     Sig : Signal
         待滤波信号
-    size : int, default: 5
+    size : int, default=5
         滤波窗口长度, 必须为正奇数
 
     Returns
     -------
     Signal
-        滤波后的信号, 采样信息与输入信号一致
-
-    See Also
-    --------
-    - scipy.signal.medfilt: 一维中值滤波实现
+        滤波后信号, 采样信息与输入信号一致
 
     Notes
     -----

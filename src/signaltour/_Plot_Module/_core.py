@@ -406,7 +406,7 @@ class BasePlot:
         if yscale == "log":  # 对数刻度下强制自动刻度
             # 主刻度：每10倍一个主刻度
             ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=12))
-            # 次刻度：每10倍区间内插9个小刻度（2~9倍）
+            # 次刻度：每10倍区间内插9个小刻度(2~9倍)
             ax.yaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs=np.arange(2, 10), numticks=100))
             ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation())
         else:
