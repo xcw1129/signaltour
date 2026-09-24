@@ -120,7 +120,7 @@ def filtMedian(
     Returns
     -------
     Signal
-        滤波后信号, 采样信息与输入信号一致
+        滤波后信号
 
     Notes
     -----

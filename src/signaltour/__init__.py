@@ -28,7 +28,7 @@
     - function:
         - `resample`: 截取信号任意时间段并重采样, 支持多种采样方式以及上采样
         - `pad`: 对信号进行边界延拓, 并对沿拓部分进行数据填充
-        - `segment`: 对信号进行滑窗跳步分段, 段间严格等长且等间隔, 首尾不沿拓
+        - `segment`: 对信号进行滑窗跳步分段, 段间严格等长且等间隔, 首尾不延拓
 ## SignalSimulate: 信号仿真模块, 提供准周期信号、冲击信号与调制信号等含噪仿真信号的生成方法
     - function:
         - `periodic`: 生成仿真含噪准周期信号
@@ -113,6 +113,11 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
 if __name__ == "__main__":
+    """
+    ```powershell
+    .\\.venv\\Scripts\\python.exe -c "import sys; sys.path[:0]=['.','src']; p='src/signaltour/__init__.py'; exec(compile(open(p, encoding='utf-8').read(), p, 'exec'), {'__name__':'__main__','__package__':'signaltour','__file__':p})"
+    ```
+    """  # noqa: E501
     from script.docstring import update_init_docstring
 
     update_init_docstring(
