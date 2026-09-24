@@ -113,7 +113,7 @@ def impulse(
 
 
 def modulation(
-    fs: float, T: float, fc: float, AM: Callable, FM: Callable, noise: float, seed: Optional[int] = None
+    fs: float, T: float, fc: float, AM: Callable, FM: Callable, noise: float = 0.0, seed: Optional[int] = None
 ) -> Signal:
     """
     生成仿真频率-幅值调制信号

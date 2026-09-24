@@ -156,7 +156,7 @@ from ._Signal import (
 )
 
 __all__ = [
-    # Signal: 数据管理子包
+    # Signal
     "Axis",
     "Series",
     "t_Axis",
@@ -176,7 +176,7 @@ __all__ = [
     "filtFIR",
     "filtIIR",
     "filtMedian",
-    # Plot: 可视化子包
+    # Plot
     "BasePlot",
     "PlotPlugin",
     "PeakfinderPlugin",
@@ -187,7 +187,7 @@ __all__ = [
     "PlotFunc_decResult",
     "ImagePlot",
     "spectrogram_PlotFunc",
-    # Analysis: 分析子包
+    # Analysis
     "BaseAnalysis",
     "StatsTrendAnalysis",
     "SpectrumAnalysis",

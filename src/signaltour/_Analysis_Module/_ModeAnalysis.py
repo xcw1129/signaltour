@@ -642,7 +642,7 @@ class VMDAnalysis(BaseAnalysis):
         # ------------------------------------------------------------------------#
         # 数据双边延拓缓解边界效应
         if self.isExtend:
-            Sig_extend = pad(Sig=self.Sig, length=len(self.Sig) // 2, method="mirror")
+            Sig_extend = pad(Sig=self.Sig, length=len(self.Sig) // 2, mode="mirror")
         else:
             Sig_extend = self.Sig
         # ------------------------------------------------------------------------#
