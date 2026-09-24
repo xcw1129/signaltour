@@ -106,7 +106,7 @@ from ._Plot import *
 from ._Analysis import *
 
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
