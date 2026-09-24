@@ -18,7 +18,7 @@ extensions = [
     "numpydoc",  # 兼容 numpy 风格注释
     "myst_parser",  # 解析 Markdown 文件
     "sphinx.ext.doctest",  # 执行 docstring 示例
-    "sphinx.ext.intersphinx",  # 交叉引用其他库（Python/NumPy/Scipy）
+    "sphinx.ext.intersphinx",  # 交叉引用其他库(Python/NumPy/Scipy)
     "sphinx.ext.mathjax",  # 渲染 LaTeX 数学公式
     "sphinx.ext.viewcode",  # 为源码生成链接
 ]

@@ -41,7 +41,7 @@ signaltour 使用指南
 ----------
 
 1. **预处理**：使用 ``Signal`` 的 ``resample``/``pad``/``slice`` 函数让数据对齐。采样率一致可避免频谱混叠。
-2. **分析**：调用 ``signaltour.Analysis`` 下的分析类（如 ``STFTAnalysis``、``EMDAnalysis``）的 ``run`` 方法，获取结构化结果对象。
+2. **分析**：调用 ``signaltour.Analysis`` 下的分析类(如 ``STFTAnalysis``、``EMDAnalysis``)的 ``run`` 方法，获取结构化结果对象。
 3. **绘图**：将分析产出传给 ``LinePlot`` / ``ImagePlot``，利用 ``plot_func`` 系列方法、插件或任务队列定制布局。
 4. **导出**：可通过 Matplotlib API 进一步保存图像或导出信号，确保与 Matplotlib 工具链兼容。
 
