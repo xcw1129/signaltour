@@ -15,7 +15,7 @@ from scipy import fft, signal
 
 from .._Plot_Module._ImagePlot import spectrogram_PlotFunc
 from .._Signal_Module._core import Signal
-from .._Signal_Module._SignalSample import slice
+from .._Signal_Module._SignalSample import segment
 from ._core import BaseAnalysis
 from ._SpectrumAnalysis import get_window
 
@@ -116,7 +116,7 @@ class STFTAnalysis(BaseAnalysis):
             分段数据矩阵, 分段时间轴
         """
         # 分段
-        segments, time = slice(Sig - np.mean(Sig), segNum=segNum, projection=True, overlap=overlap)
+        segments, time = segment(Sig - np.mean(Sig), segNum=segNum, projection=True, overlap=overlap)
         nperseg = segments.shape[1]
         # 延拓
         segments = np.pad(

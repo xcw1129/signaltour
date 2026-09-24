@@ -43,16 +43,16 @@ def periodic(fs: float, T: float, CosParams: tuple, noise: float = 0.0, seed: Op
     Signal
         仿真周期信号
     """
-    Sig = Signal(axis=t_Axis(T=T, fs=fs), label="仿真周期信号")
-    time = Sig.t_axis()
+    sig = Signal(axis=t_Axis(T=T, fs=fs), label="仿真周期信号")
+    time = sig.t_axis()
     for i, params in enumerate(CosParams):
         if len(params) != 3:
             raise ValueError(f"CosParams={params}: 余弦成分生成参数格式错误")
         f, A, phi = params
-        Sig += A * np.cos(2 * np.pi * f * time + phi)  # 生成任意频率、幅值、初相位的余弦信号
+        sig += A * np.cos(2 * np.pi * f * time + phi)  # 生成任意频率、幅值、初相位的余弦信号
     rng = np.random.default_rng(seed)
-    Sig += rng.standard_normal(len(Sig)) * noise
-    return Sig
+    sig += rng.standard_normal(len(sig)) * noise
+    return sig
 
 
 def impulse(
@@ -80,9 +80,9 @@ def impulse(
     Signal
         仿真冲击信号
     """
-    Sig = Signal(axis=t_Axis(T=T, fs=fs), label="仿真冲击信号")
-    N = len(Sig)
-    t = Sig.t_axis()
+    sig = Signal(axis=t_Axis(T=T, fs=fs), label="仿真冲击信号")
+    N = len(sig)
+    t = sig.t_axis()
     # 准备冲击序列参数
     if len(ImpParams) != 5:
         raise ValueError(f"ImpParams={ImpParams}: 冲击序列生成参数格式错误")
@@ -100,7 +100,7 @@ def impulse(
         idx1 = max(0, idx)  # 实际脉冲起始索引
         idx2 = min(N, idx + len(imp_wave))  # 实际脉冲结束索引
         if idx2 > idx1:
-            Sig._data[idx1:idx2] += imp_wave[idx1 - idx : idx2 - idx] * A_array[idx1]  # 单个冲击幅值不变
+            sig._data[idx1:idx2] += imp_wave[idx1 - idx : idx2 - idx] * A_array[idx1]  # 单个冲击幅值不变
     # 加入噪声冲击
     if noiseParams is not None:
         rng = np.random.default_rng(seed)
@@ -108,8 +108,8 @@ def impulse(
         noise_idx = rng.choice(N, size=n, replace=False)  # 随机选择噪声冲击位置索引
         noise_amplitudes = rng.exponential(scale=la, size=n)  # la越大, 噪声冲击幅值越大
         noise_imp_wave = np.bincount(noise_idx, weights=noise_amplitudes, minlength=N)
-        Sig._data += noise_imp_wave
-    return Sig
+        sig._data += noise_imp_wave
+    return sig
 
 
 def modulation(
@@ -140,13 +140,13 @@ def modulation(
     Signal
         仿真调制信号
     """
-    Sig = Signal(axis=t_Axis(T=T, fs=fs), label="仿真调制信号")
-    t = Sig.t_axis()
+    sig = Signal(axis=t_Axis(T=T, fs=fs), label="仿真调制信号")
+    t = sig.t_axis()
     # 生成调制相位
     phase = 2 * np.pi * fc * t + 2 * np.pi * np.cumsum(FM(t)) / fs
     # 生成调制信号
-    Sig += AM(t) * np.cos(phase)
+    sig += AM(t) * np.cos(phase)
     # 添加噪声
     rng = np.random.default_rng(seed)
-    Sig += rng.standard_normal(len(Sig)) * noise
-    return Sig
+    sig += rng.standard_normal(len(sig)) * noise
+    return sig

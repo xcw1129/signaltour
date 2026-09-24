@@ -14,7 +14,7 @@ from scipy import stats
 
 from .._Plot_Module._LinePlot import PlotFunc_waveform
 from .._Signal_Module._core import Series, t_Axis
-from .._Signal_Module._SignalSample import slice
+from .._Signal_Module._SignalSample import segment
 from ._core import BaseAnalysis
 
 
@@ -112,7 +112,7 @@ class StatsTrendAnalysis(BaseAnalysis):
             统计值时域趋势序列
         """
         # 信号滑动切片
-        seg_data_list, seg_time = slice(
+        seg_data_list, seg_time = segment(
             self.Sig, segNum=segNum, tperseg=tperseg, pad_mode="edge"
         )  # 默认50%重叠, 边界常数填充
         # 计算所有分段统计值

@@ -4,10 +4,10 @@
     - function:
         - `resample`: 截取信号任意时间段并重采样, 支持多种采样方式以及上采样
         - `pad`: 对信号进行边界延拓, 并对沿拓部分进行数据填充
-        - `slice`: 对信号进行滑窗跳步分段, 段间严格等长且等间隔, 首尾不沿拓
+        - `segment`: 对信号进行滑窗跳步分段, 段间严格等长且等间隔, 首尾不沿拓
 """
 
-__all__ = ["resample", "pad", "slice"]
+__all__ = ["resample", "pad", "segment"]
 
 from typing import List, Optional
 
@@ -21,7 +21,7 @@ from ._core import Signal, t_Axis
 # ------------------------------------------------------------------------#
 # ----------------------------------------------------------------#
 def resample(
-    Sig: Signal,
+    sig: Signal,
     type: str = "spacing",
     dt: Optional[float] = None,
     t0: Optional[float] = None,
@@ -32,7 +32,7 @@ def resample(
 
     Parameters
     ----------
-    Sig : Signal
+    sig : Signal
         待重采样信号
     type : str, default='spacing'
         重采样方法, 支持:
@@ -51,24 +51,24 @@ def resample(
     Signal
         重采样后信号
     """
-    dt = Sig.t_axis.dt if dt is None else dt
-    t0 = Sig.t_axis.t0 if t0 is None else t0
+    dt = sig.t_axis.dt if dt is None else dt
+    t0 = sig.t_axis.t0 if t0 is None else t0
     # 获取重采样起点索引
-    start_idx = int(np.ceil((t0 - Sig.t_axis.t0) / Sig.t_axis.dt - 1e-5))
-    if start_idx < 0 or start_idx >= len(Sig):
+    start_idx = int(np.ceil((t0 - sig.t_axis.t0) / sig.t_axis.dt - 1e-5))
+    if start_idx < 0 or start_idx >= len(sig):
         raise ValueError(f"t0={t0}, idx={start_idx}: 重采样起点超出信号时间轴范围")
-    t0 = Sig.t_axis.t0 + start_idx * Sig.t_axis.dt  # 修正重采样起点, 避免浮点数误差
+    t0 = sig.t_axis.t0 + start_idx * sig.t_axis.dt  # 修正重采样起点, 避免浮点数误差
     # 截取重采样数据片段
     if T is None:
-        data2rs = Sig._data[start_idx:].copy()
+        data2rs = sig._data[start_idx:].copy()
     else:
-        N2rs = int(np.ceil(T / (Sig.t_axis.dt) - 1e-5))
-        if start_idx + N2rs > len(Sig):
+        N2rs = int(np.ceil(T / (sig.t_axis.dt) - 1e-5))
+        if start_idx + N2rs > len(sig):
             raise ValueError(f"T={T}, idx={start_idx + N2rs}: 重采样终点超出信号时间轴范围")
-        data2rs = Sig._data[start_idx : start_idx + N2rs].copy()
+        data2rs = sig._data[start_idx : start_idx + N2rs].copy()
     # 计算重采样后信号点数
     N_in = len(data2rs)
-    ratio2rs = Sig.t_axis.dt / dt
+    ratio2rs = sig.t_axis.dt / dt
     N_out = int(round(N_in * ratio2rs))  # N_out = N_in * (dx_in / dx_out)
     if N_in == N_out:
         ratio2rs = 1.0
@@ -123,22 +123,19 @@ def resample(
             raise ValueError(f"dt={dt}, type={type}: 当前采样方法不支持上采样. 使用type='fft'")
     else:
         pass  # 采样频率相同, 不进行重采样
-    return Signal(
-        axis=t_Axis(len(data2rs), dt=dt, t0=t0),
-        data=data2rs,
-        name=Sig.name,
-        unit=Sig.unit,
-        label=Sig.label,
-    )
+    sig_resampled = sig.template()
+    sig_resampled._axis = t_Axis(len(data2rs), dt=dt, t0=t0)
+    sig_resampled._data = data2rs
+    return sig_resampled
 
 
-def pad(Sig: Signal, pad_width: int, mode: str = "constant") -> Signal:
+def pad(sig: Signal, pad_width: int, mode: str = "constant") -> Signal:
     """
     对信号进行边界延拓, 并对沿拓部分进行数据填充
 
     Parameters
     ----------
-    Sig : Signal
+    sig : Signal
         待延拓信号
     pad_width : int
         单边延拓长度
@@ -161,21 +158,18 @@ def pad(Sig: Signal, pad_width: int, mode: str = "constant") -> Signal:
     Signal
         延拓后信号
     """
-    extend_data = np.pad(Sig._data, pad_width, mode=mode)  # ty:ignore[no-matching-overload]
-    t_axis_extend = Sig.t_axis.copy()
+    extend_data = np.pad(sig._data, pad_width, mode=mode)  # ty:ignore[no-matching-overload]
+    t_axis_extend = sig.t_axis.copy()
     t_axis_extend.N = len(extend_data)
-    t_axis_extend.t0 = Sig.t_axis.t0 - pad_width * Sig.t_axis.dt
-    return Signal(
-        axis=t_axis_extend,
-        data=extend_data,
-        name=Sig.name,
-        unit=Sig.unit,
-        label=Sig.label,
-    )
+    t_axis_extend.t0 = sig.t_axis.t0 - pad_width * sig.t_axis.dt
+    sig_extend = sig.template()
+    sig_extend._axis = t_axis_extend
+    sig_extend._data = extend_data
+    return sig_extend
 
 
-def slice(
-    Sig: Signal,
+def segment(
+    sig: Signal,
     nseg: Optional[int] = None,
     tperseg: Optional[float] = None,
     overlap: float = 0.5,
@@ -185,7 +179,7 @@ def slice(
 
     Parameters
     ----------
-    Sig : Signal
+    sig : Signal
         待分段信号
     nseg : int, optional
         分段数, 优先级高于 tperseg
@@ -202,7 +196,7 @@ def slice(
     """
     # --------------------------------------------------------------------------------#
     # 参数校验
-    N = len(Sig)
+    N = len(sig)
     if not 0 <= overlap < 1:
         raise ValueError(f"overlap={overlap}: 重叠比例超出范围. 使用范围[0, 1)")
     if nseg is not None and tperseg is None:
@@ -215,7 +209,7 @@ def slice(
             nhop = int(N * (1 - overlap) / ((nseg - 1) * (1 - overlap) + 1))
             nperseg = min(int(nhop / (1 - overlap)), N - (nseg - 1) * nhop)
     elif nseg is None and tperseg is not None:
-        nperseg = int(tperseg / Sig.t_axis.dt)
+        nperseg = int(tperseg / sig.t_axis.dt)
         nhop = int(nperseg * (1 - overlap))
         nseg = int((N - nperseg) / nhop + 1)
     else:
@@ -230,22 +224,18 @@ def slice(
     # --------------------------------------------------------------------------------#
     # 信号分段
     seg_data_list = np.lib.stride_tricks.as_strided(
-        Sig._data,  # 直接映射到原始数据, 省去拷贝开销
+        sig._data,  # 直接映射到原始数据, 省去拷贝开销
         shape=(nseg, nperseg),
-        strides=(nhop * Sig._data.strides[0], Sig._data.strides[0]),
+        strides=(nhop * sig._data.strides[0], sig._data.strides[0]),
         writeable=False,  # 设置为只读, 避免修改原始数据
     )
     # 生成分段标志时刻列表
-    seg_time = np.arange(nseg) * (nhop * Sig.t_axis.dt) + Sig.t_axis.t0
+    seg_time = np.arange(nseg) * (nhop * sig.t_axis.dt) + sig.t_axis.t0
     # 生成分段信号
     Listsig = []
     for seg_data, seg_t in zip(seg_data_list, seg_time):
-        seg_sig = Signal(
-            axis=t_Axis(len(seg_data), dt=Sig.t_axis.dt, t0=seg_t),
-            data=seg_data,
-            name=Sig.name,
-            unit=Sig.unit,
-            label=Sig.label,
-        )
-        Listsig.append(seg_sig)
+        sig_seg = sig.template()
+        sig_seg._axis = t_Axis(len(seg_data), dt=sig.t_axis.dt, t0=seg_t)
+        sig_seg._data = seg_data
+        Listsig.append(sig_seg)
     return Listsig

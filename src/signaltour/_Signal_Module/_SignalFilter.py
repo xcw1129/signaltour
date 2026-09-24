@@ -17,7 +17,7 @@ from ._core import Signal
 
 
 def filtFIR(
-    Sig: Signal,
+    sig: Signal,
     cutoff: float | Tuple[float, float],
     order: int = 128,
     btype: str = "lowpass",
@@ -29,7 +29,7 @@ def filtFIR(
 
     Parameters
     ----------
-    Sig : Signal
+    sig : Signal
         待滤波信号
     cutoff : float or tuple[float, float]
         截止频率(Hz), band 类型需提供两个元素
@@ -47,7 +47,7 @@ def filtFIR(
     Signal
         滤波后信号
     """
-    fs = Sig.t_axis.fs
+    fs = sig.t_axis.fs
     b = signal.firwin(
         numtaps=order,
         cutoff=cutoff,
@@ -55,12 +55,12 @@ def filtFIR(
         pass_zero=btype,
         fs=fs,
     )
-    filtered = signal.lfilter(b, [1.0], Sig._data) if zero_phase is False else signal.filtfilt(b, [1.0], Sig._data)
-    return Sig.template(filtered)
+    filtered = signal.lfilter(b, [1.0], sig._data) if zero_phase is False else signal.filtfilt(b, [1.0], sig._data)
+    return sig.template(filtered)
 
 
 def filtIIR(
-    Sig: Signal,
+    sig: Signal,
     cutoff: float | Tuple[float, float],
     order: int = 4,
     btype: str = "lowpass",
@@ -74,7 +74,7 @@ def filtIIR(
 
     Parameters
     ----------
-    Sig : Signal
+    sig : Signal
         待滤波信号
     cutoff : float or tuple[float, float]
         截止频率(Hz)，band 类型需提供两个元素
@@ -97,14 +97,14 @@ def filtIIR(
     IIR滤波器相比FIR滤波器计算效率更高, 达到相同阻带衰减效果所需的阶数相比FIR滤波器低的多.
     但可能由于非线性相位延迟导致的波形失真和稳定性问题, 建议只在滤波精度要求不高、只关心频谱特性的场景下使用.
     """
-    fs = Sig.t_axis.fs
+    fs = sig.t_axis.fs
     sos = signal.iirfilter(N=order, Wn=cutoff, btype=btype, ftype=ftype, fs=fs, output="sos")
-    filtered = signal.sosfilt(sos, Sig._data) if zero_phase is False else signal.sosfiltfilt(sos, Sig._data)
-    return Sig.template(filtered)
+    filtered = signal.sosfilt(sos, sig._data) if zero_phase is False else signal.sosfiltfilt(sos, sig._data)
+    return sig.template(filtered)
 
 
 def filtMedian(
-    Sig: Signal,
+    sig: Signal,
     size: int = 5,
 ) -> Signal:
     """
@@ -112,7 +112,7 @@ def filtMedian(
 
     Parameters
     ----------
-    Sig : Signal
+    sig : Signal
         待滤波信号
     size : int, default=5
         滤波窗口长度, 必须为正奇数
@@ -126,5 +126,5 @@ def filtMedian(
     -----
     中值滤波器对脉冲噪声和尖峰干扰有良好的抑制效果，常用于去除信号中的孤立异常点
     """
-    filtered = signal.medfilt(Sig._data, kernel_size=size)
-    return Sig.template(filtered)
+    filtered = signal.medfilt(sig._data, kernel_size=size)
+    return sig.template(filtered)

@@ -20,6 +20,8 @@ from typing import Optional, Self, Tuple
 import numpy as np
 from numpy.lib.mixins import NDArrayOperatorsMixin
 
+from .__methods__ import SignalFilter, SignalSample
+
 
 # --------------------------------------------------------------------------------------------#
 # --------------------------------------------------------------------------------#
@@ -674,7 +676,7 @@ class f_Axis(Axis):
 
 
 # --------------------------------------------------------------------------------------------#
-class Signal(Series):
+class Signal(SignalFilter, SignalSample, Series):
     """
     一维时域信号类, 实现采样信息与数据的绑定, 支持混合运算并内置常用信号数据交互方法
 
@@ -703,6 +705,18 @@ class Signal(Series):
         继承元信息生成新对象, 方便快速创建同类对象
     - to_Spectra() -> Spectra
         转换信号到其频谱
+    - filtFIR(cutoff, order=128, btype='lowpass', window='hamming', zero_phase=False) -> Signal
+        基于有限冲击响应滤波器对信号进行卷积滑窗滤波
+    - filtIIR(cutoff, order=4, btype='lowpass', ftype='butter', zero_phase=False) -> Signal
+        基于无限冲击响应滤波器对信号进行反馈递归滤波
+    - filtMedian(size=5) -> Signal
+        基于中值滤波器对信号进行卷积滑窗滤波
+    - resample(type='spacing', dt=None, t0=None, T=None) -> Signal
+        截取信号任意时间段并重采样, 支持多种采样方式以及上采样
+    - pad(pad_width, mode='constant') -> Signal
+        对信号进行边界延拓, 并对沿拓部分进行数据填充
+    - segment(nseg=None, tperseg=None, overlap=0.5) -> List[Signal]
+        对信号进行滑窗跳步分段, 段间严格等长且等间隔, 首尾不沿拓
     """
 
     def __init__(
