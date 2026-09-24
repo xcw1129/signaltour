@@ -265,12 +265,10 @@ class Series(NDArrayOperatorsMixin):
         self.unit: str = unit
         self.label: str = label
         self._data: np.ndarray = np.asarray(data, copy=self._COPY_ARRAY) if data is not None else np.zeros(len(axis))
-        if self._data.flags.writeable is False:
-            self._data = np.array(self._data, copy=True)
         if self._check_data(self._data) is False:
             raise ValueError(f"data={self._data}: 输入序列数据数组非法. 避免使用非一维数组, 长度不匹配或包含NaN值")
 
-    _COPY_ARRAY = True
+    _COPY_ARRAY = None
 
     # --------------------------------------------------------------------------------#
     # 动态可读属性
@@ -297,8 +295,6 @@ class Series(NDArrayOperatorsMixin):
         if self._check_data(value) is False:
             raise ValueError(f"data={value}: 输入序列数据数组非法. 避免使用非一维数组, 长度不匹配或包含NaN值")
         self._data = np.asarray(value, copy=self._COPY_ARRAY)
-        if self._data.flags.writeable is False:
-            self._data = np.array(self._data, copy=True)
 
     # --------------------------------------------------------------------------------#
     # 数据检查和转换

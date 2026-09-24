@@ -9,7 +9,7 @@
 
 __all__ = ["resample", "pad", "slice"]
 
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 
@@ -179,7 +179,7 @@ def slice(
     nseg: Optional[int] = None,
     tperseg: Optional[float] = None,
     overlap: float = 0.5,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> List[Signal]:
     """
     对信号进行滑窗跳步分段, 段间严格等长且等间隔, 首尾不沿拓
 
@@ -197,20 +197,38 @@ def slice(
 
     Returns
     -------
-    seg_data_list : np.ndarray, shape=(nseg, nperseg)
-        分段信号数据
-    seg_time : np.ndarray
-        分段中心时间轴
+    Listsig : list[Signal]
+        分段信号列表
     """
+    # --------------------------------------------------------------------------------#
+    # 参数校验
+    N = len(Sig)
+    if not 0 <= overlap < 1:
+        raise ValueError(f"overlap={overlap}: 重叠比例超出范围. 使用范围[0, 1)")
     if nseg is not None and tperseg is None:
-        nhop = int((len(Sig) - 1) / (nseg - 1))
-        nperseg = int(nhop / (1 - overlap))
+        if nseg < 1:
+            raise ValueError(f"nseg={nseg}: 分段数必须为正整数")
+        if nseg == 1:  # 单段即整段信号
+            nhop, nperseg = N, N
+        else:
+            # 由分段数反推跳步: 满足 (nseg-1)*nhop + nperseg <= N 且 nperseg = nhop/(1-overlap)
+            nhop = int(N * (1 - overlap) / ((nseg - 1) * (1 - overlap) + 1))
+            nperseg = min(int(nhop / (1 - overlap)), N - (nseg - 1) * nhop)
     elif nseg is None and tperseg is not None:
         nperseg = int(tperseg / Sig.t_axis.dt)
         nhop = int(nperseg * (1 - overlap))
-        nseg = int((len(Sig) - 1) / nhop + 1)
+        nseg = int((N - nperseg) / nhop + 1)
     else:
         raise ValueError(f"nseg={nseg}, tperseg={tperseg}: 分段数和分段时长参数输入错误. 仅指定其中一个")
+    # as_strided 不做边界检查, 越界会读到缓冲区外的内存垃圾, 必须显式校验
+    if nseg < 1 or nhop < 1 or nperseg < 1:
+        raise ValueError(f"nseg={nseg}, nhop={nhop}, nperseg={nperseg}: 分段窗口长度非法, 请增大信号长度或调整参数")
+    if (nseg - 1) * nhop + nperseg > N:
+        raise ValueError(
+            f"nseg={nseg}, nhop={nhop}, nperseg={nperseg}: 分段窗口超出信号范围, 请减小分段数/分段时长/重叠比例"
+        )
+    # --------------------------------------------------------------------------------#
+    # 信号分段
     seg_data_list = np.lib.stride_tricks.as_strided(
         Sig._data,  # 直接映射到原始数据, 省去拷贝开销
         shape=(nseg, nperseg),
@@ -218,5 +236,16 @@ def slice(
         writeable=False,  # 设置为只读, 避免修改原始数据
     )
     # 生成分段标志时刻列表
-    seg_time = np.arange(seg_data_list.shape[0]) * (seg_data_list.shape[1] * Sig.t_axis.dt) + Sig.t_axis.t0
-    return seg_data_list, seg_time
+    seg_time = np.arange(nseg) * (nhop * Sig.t_axis.dt) + Sig.t_axis.t0
+    # 生成分段信号
+    Listsig = []
+    for seg_data, seg_t in zip(seg_data_list, seg_time):
+        seg_sig = Signal(
+            axis=t_Axis(len(seg_data), dt=Sig.t_axis.dt, t0=seg_t),
+            data=seg_data,
+            name=Sig.name,
+            unit=Sig.unit,
+            label=Sig.label,
+        )
+        Listsig.append(seg_sig)
+    return Listsig
