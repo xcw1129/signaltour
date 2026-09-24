@@ -22,7 +22,7 @@ import numpy as np
 
 from .._Signal_Module._core import Series, Signal, Spectra
 from ._core import BasePlot
-from ._PlotPlugin import PeakfinderPlugin, PosNagMaskPlugin
+from ._BasePlotPlugin import PeakfinderPlugin, PosNagMaskPlugin
 
 # --------------------------------------------------------------------------------------------#
 # --------------------------------------------------------------------------------#
@@ -71,7 +71,7 @@ class LinePlot(BasePlot):
             -> Self
         为最新添加的绘图任务设置专属参数
 
-    - add_plugin_to_task(plugin: PlotPlugin)
+    - add_plugin_to_task(plugin: BasePlotPlugin)
             -> Self
         为最新添加的绘图任务添加一个插件
 

@@ -1,5 +1,5 @@
 """
-# PlotPlugin: 绘图插件模块, 提供谱线峰值查找与正负值掩码等可插拔绘图插件
+# BasePlotPlugin: 绘图插件模块, 提供谱线峰值查找与正负值掩码等可插拔绘图插件
 
     - class:
         - `PeakfinderPlugin`: 谱线峰值查找插件，用于查找并标注谱类数据中谱线主瓣对应的坐标
@@ -12,7 +12,7 @@ from typing import Dict
 
 import matplotlib.pyplot as plt
 
-from ._core import PlotPlugin
+from ._core import BaseBasePlotPlugin
 
 # --------------------------------------------------------------------------------------------#
 # --------------------------------------------------------------------------------#
@@ -20,7 +20,7 @@ from ._core import PlotPlugin
 # ----------------------------------------------------------------#
 
 
-class PeakfinderPlugin(PlotPlugin):
+class PeakfinderPlugin(BaseBasePlotPlugin):
     """谱线峰值查找插件，用于查找并标注谱类数据中谱线主瓣对应的坐标"""
 
     def __init__(self, threshold: float = 0.85, distance: float = 0.01):
@@ -68,7 +68,7 @@ class PeakfinderPlugin(PlotPlugin):
                 )
 
 
-class PosNagMaskPlugin(PlotPlugin):
+class PosNagMaskPlugin(BaseBasePlotPlugin):
     """谱线正负值掩码插件, 用于对谱类数据中正负值进行不同颜色显示"""
 
     def __init__(self, sensitivity: float = 0.05):

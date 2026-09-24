@@ -2,7 +2,7 @@
 # 项目基本信息
 [project]
 name = "signaltour"
-version = "1.2.0"
+version = "1.3.0"
 authors = [
     {name = "Xiong Chengwen/熊成文", email = "xiongcw1129@gmail.com"},
 ]

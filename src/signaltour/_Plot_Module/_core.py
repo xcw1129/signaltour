@@ -3,10 +3,10 @@
 
     - class:
         - `BasePlot`: 通用绘图基类, 实现多绘图任务流程框架, 供子类继承并实现具体绘图逻辑
-        - `PlotPlugin`: 绘图插件基类, 实现可插拔绘图功能, 供子类继承并实现具体插件逻辑
+        - `BasePlotPlugin`: 绘图插件基类, 实现可插拔绘图功能, 供子类继承并实现具体插件逻辑
 """
 
-__all__ = ["BasePlot", "PlotPlugin"]
+__all__ = ["BasePlot", "BasePlotPlugin"]
 
 import logging
 import os
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------------#
 # ------------------------------------------------------------------------#
 # ----------------------------------------------------------------#
-class PlotPlugin:
+class BasePlotPlugin:
     """
     绘图插件基类, 实现可插拔绘图功能, 供子类继承并实现具体插件逻辑
 
@@ -93,7 +93,7 @@ class BasePlot:
             -> Self
         为最新添加的绘图任务设置专属参数
 
-    - add_plugin_to_task(plugin: PlotPlugin)
+    - add_plugin_to_task(plugin: BasePlotPlugin)
             -> Self
         为最新添加的绘图任务添加一个插件
 
@@ -437,10 +437,10 @@ class BasePlot:
         self.last_task["kwargs"].update(kwargs)
         return self
 
-    def add_plugin(self, plugin: PlotPlugin) -> Self:
+    def add_plugin(self, plugin: BasePlotPlugin) -> Self:
         """为最新添加的绘图任务设置额外插件"""
-        if not isinstance(plugin, PlotPlugin):
-            raise ValueError(f"plugin={plugin}: 输入插件对象必须是PlotPlugin实例")
+        if not isinstance(plugin, BasePlotPlugin):
+            raise ValueError(f"plugin={plugin}: 输入插件对象必须是BasePlotPlugin实例")
         self.last_task["plugins"].append(plugin)
         return self
 

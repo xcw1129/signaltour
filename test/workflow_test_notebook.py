@@ -209,7 +209,7 @@ def _():
     return
 
 
-@app.cell
+@app.cell(expand_output=True)
 def _():
     sig = st.Signal(axis=st.t_Axis(fs=10000, T=1), label="仿真信号")
     sig += st.periodic(
@@ -297,14 +297,14 @@ def _():
 @app.cell
 def _(sig):
     _sig = sig.filtFIR(cutoff=(2000,3000),order=256, btype="bandpass", zero_phase=True)
-    mo.vstack([_sig.plot(ylim=(-50,50))[0]], align="center")
+    mo.vstack([_sig.plot()[0]], align="center")
     return
 
 
 @app.cell
 def _(sig):
     _sig = sig.filtIIR(cutoff=(2000,3000),btype='bandpass',ftype='butter')
-    mo.vstack([_sig.plot(ylim=(-50,50))[0]], align="center")
+    mo.vstack([_sig.plot()[0]], align="center")
     return
 
 
@@ -320,51 +320,6 @@ def _():
     mo.md(r"""
     ## 3. 信号特征提取
     """)
-    return
-
-
-@app.cell
-def _(sig_filtered):
-    spc_IA = st.HilbertAnalysis(sig_filtered, isPlot=True).envelopeSpectrum()
-    spc_IA[:10] = 0
-    spc_IA.plot(xlim=(0, 300))
-    mo.vstack([plt.gcf()], align="center")
-    return
-
-
-@app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    ## 4. 批量对比分析
-    """)
-    return
-
-
-@app.cell
-def _(dataset):
-    dataset.loadMatch(match="12k, Drive End, 021", filter="_0")
-    return
-
-
-@app.cell
-def _(dataset):
-    _datafiles_dict = dataset.loadMatch(match="12k, Drive End, 0021", filter="_0")
-    for _loc, _df in _datafiles_dict.items():
-        _fig_list = []
-        _sig = st.Signal(
-            axis=st.t_Axis(N=len(_df), fs=12000),
-            data=_df.iloc[:, 0],
-            name="加速度",
-            unit="$g$",
-            label=f"驱动端{_df.columns[0]}振动信号",
-        )
-        _sig.plot()
-        _fig_list.append(plt.gcf())
-        _spc_IA = st.HilbertAnalysis(_sig).envelopeSpectrum()
-        _spc_IA[:10] = 0
-        _spc_IA["0Hz":"300Hz"].plot()
-        _fig_list.append(plt.gcf())
-        mo.output.append(mo.vstack(_fig_list, align="center"))
     return
 
 
