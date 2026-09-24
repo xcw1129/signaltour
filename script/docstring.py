@@ -39,6 +39,85 @@ def _extract_interface_docstrings(tree: ast.Module, all_names: list):
     return functions_docs, classes_docs
 
 
+def _read_module_tree(fpath: str):
+    """读取模块文件并解析为抽象语法树, 读取或解析失败时返回None"""
+    try:
+        with open(fpath, "r", encoding="utf-8") as f:
+            return ast.parse(f.read())
+    except OSError:
+        return None
+    except SyntaxError as e:
+        print(f"错误: 解析文件失败: {e} \n'{fpath}'")
+        return None
+
+
+def _collect_star_imported_module_paths(tree: ast.Module, fpath: str):
+    """收集AST中星号导入语句对应的被导入模块文件路径, 保持源码顺序"""
+    module_files = []
+    seen = set()
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom) or not node.module:
+            continue
+        if not any(alias.name == "*" for alias in node.names):
+            continue
+        candidate = _resolve_imported_module_file(fpath, node.module, node.level)
+        if candidate and os.path.exists(candidate) and candidate not in seen:
+            seen.add(candidate)
+            module_files.append(candidate)
+    return module_files
+
+
+def _resolve_interfaces(fpath: str, seen: set = None):
+    """解析模块对外暴露的接口清单及其文档字符串首行
+
+    模块自身定义`__all__`时以`__all__`为接口清单, 摘要取自本模块中的接口定义;
+    未定义`__all__`时按`from ... import *`语句的源码顺序汇总被导入模块的接口与摘要,
+    以支持包导出文件只做星号再导出的接口汇聚写法。
+
+    Parameters
+    ----------
+    fpath : str
+        模块文件路径
+    seen : set, optional
+        已访问的模块路径集合, 用于避免循环导入造成无限递归
+
+    Returns
+    -------
+    tuple
+        (接口名列表, 函数摘要映射, 类摘要映射), 摘要为接口文档字符串首行
+    """
+    if seen is None:
+        seen = set()
+    fpath = os.path.abspath(fpath)
+    if fpath in seen:
+        return [], {}, {}
+    seen.add(fpath)
+    tree = _read_module_tree(fpath)
+    if tree is None:
+        return [], {}, {}
+    all_names = _extract_all_list(tree)
+    if all_names:
+        functions_docs, classes_docs = _extract_interface_docstrings(tree, all_names)
+        return all_names, functions_docs, classes_docs
+    # 未定义__all__: 沿星号导入链按导入顺序汇总各接口与摘要
+    all_names = []
+    functions_docs = {}
+    classes_docs = {}
+    for module_path in _collect_star_imported_module_paths(tree, fpath):
+        names, functions, classes = _resolve_interfaces(module_path, seen)
+        for name in names:
+            if name in functions_docs or name in classes_docs:
+                continue
+            if name in functions:
+                functions_docs[name] = functions[name]
+            elif name in classes:
+                classes_docs[name] = classes[name]
+            else:
+                continue
+            all_names.append(name)
+    return all_names, functions_docs, classes_docs
+
+
 def update_module_docstring(fpath: str, title: str = "", summary: str = ""):
     """更新指定模块接口实现文件的文档字符串"""
     # 1. 删除现有的模块文档字符串
@@ -56,14 +135,8 @@ def update_module_docstring(fpath: str, title: str = "", summary: str = ""):
         content_after_docstring = original_content[match.end() :]
         content_after_docstring = re.sub(r"^\n+", "", content_after_docstring)
 
-    # 2. 解析文件内容以获取__all__和接口文档
-    try:
-        tree = ast.parse(content_after_docstring)
-    except SyntaxError as e:
-        print(f"错误: 解析文件失败: {e} \n'{fpath}'")
-        return
-    all_names = _extract_all_list(tree)
-    functions_docs, classes_docs = _extract_interface_docstrings(tree, all_names)
+    # 2. 解析文件内容以获取接口清单与接口文档
+    all_names, functions_docs, classes_docs = _resolve_interfaces(fpath)
 
     # 3. 构建新的模块文档字符串
     docstring_head = f"# {os.path.splitext(os.path.basename(fpath))[0]}"  # 文件名作为模块标题
@@ -79,7 +152,7 @@ def update_module_docstring(fpath: str, title: str = "", summary: str = ""):
         if title == "":
             title = os.path.splitext(os.path.basename(fpath))[0]  # 文件名作为模块标题
         docstring_head = f"# {title}: {summary}"
-    # 按照__all__的顺序组成接口文档字符串, 且class排在function之前
+    # 按照接口清单顺序组成接口文档字符串, 且class排在function之前
     function_lines = []
     class_lines = []
     for name in all_names:
@@ -182,7 +255,7 @@ def update_package_docstring(fpath: str, summary: str):
     # 4. 构建聚合模块文档字符串
     aggregate_title = os.path.splitext(os.path.basename(fpath))[0].lstrip("_")  # 标题不含模块文件名的下划线前缀
     header = f"\n# {aggregate_title}" + (f": {summary}" if summary else "") + "\n\n"
-    docstring = '"""' + header + "\n".join(collected_sections) + '\n"""\n'
+    docstring = '"""' + header + "\n".join(collected_sections) + '\n"""\n\n'
 
     # 5. 写入文件顶部
     final_content = docstring + content_after_docstring

@@ -23,23 +23,10 @@
         - `PosNagMaskPlugin`: 谱线正负值掩码插件, 用于对谱类数据中正负值进行不同颜色显示
 """
 
-__all__ = [
-    "BasePlot",
-    "PlotPlugin",
-    "PeakfinderPlugin",
-    "PosNagMaskPlugin",
-    "LinePlot",
-    "PlotFunc_waveform",
-    "PlotFunc_spectrum",
-    "PlotFunc_decResult",
-    "ImagePlot",
-    "spectrogram_PlotFunc",
-]
-
-from ._Plot_Module._core import BasePlot, PlotPlugin
-from ._Plot_Module._ImagePlot import ImagePlot, spectrogram_PlotFunc
-from ._Plot_Module._LinePlot import LinePlot, PlotFunc_decResult, PlotFunc_spectrum, PlotFunc_waveform
-from ._Plot_Module._PlotPlugin import PeakfinderPlugin, PosNagMaskPlugin
+from ._Plot_Module._core import *
+from ._Plot_Module._ImagePlot import *
+from ._Plot_Module._LinePlot import *
+from ._Plot_Module._PlotPlugin import *
 
 if __name__ == "__main__":
     from script.docstring import update_package_docstring

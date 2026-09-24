@@ -36,49 +36,12 @@
         - `DWTAnalysis`: 离散小波变换 (Discrete Wavelet Transform, DWT) 分析类
 """
 
-__all__ = [
-    "BaseAnalysis",
-    "StatsTrendAnalysis",
-    "SpectrumAnalysis",
-    "HilbertAnalysis",
-    "get_window",
-    "find_spectralines",
-    "convolveCycle",
-    "convolve",
-    "STFTAnalysis",
-    "WVDAnalysis",
-    "CWTAnalysis",
-    "DWTAnalysis",
-    "EMDAnalysis",
-    "VMDAnalysis",
-    "siftProcess_PlotFunc",
-    "updateProcess_PlotFunc",
-    "search_localExtrema",
-    "get_spectraCenter",
-    "get_Trend",
-]
-
-from ._Analysis_Module._core import BaseAnalysis
-from ._Analysis_Module._ModeAnalysis import (
-    EMDAnalysis,
-    VMDAnalysis,
-    get_spectraCenter,
-    get_Trend,
-    search_localExtrema,
-    siftProcess_PlotFunc,
-    updateProcess_PlotFunc,
-)
-from ._Analysis_Module._SpectrumAnalysis import (
-    HilbertAnalysis,
-    SpectrumAnalysis,
-    convolve,
-    convolveCycle,
-    find_spectralines,
-    get_window,
-)
-from ._Analysis_Module._StatsTrendAnalysis import StatsTrendAnalysis
-from ._Analysis_Module._TimeFreqAnalysis import STFTAnalysis, WVDAnalysis
-from ._Analysis_Module._WaveletAnalysis import CWTAnalysis, DWTAnalysis
+from ._Analysis_Module._core import *
+from ._Analysis_Module._ModeAnalysis import *
+from ._Analysis_Module._SpectrumAnalysis import *
+from ._Analysis_Module._StatsTrendAnalysis import *
+from ._Analysis_Module._TimeFreqAnalysis import *
+from ._Analysis_Module._WaveletAnalysis import *
 
 if __name__ == "__main__":
     from script.docstring import update_package_docstring
