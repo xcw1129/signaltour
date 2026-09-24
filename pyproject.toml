@@ -65,7 +65,7 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 [tool.ruff.lint.isort]
-known-first-party = ["signal"]
+known-first-party = ["signaltour"]
 # 格式化规则
 [tool.ruff.format]
 quote-style = "double"
