@@ -164,6 +164,51 @@ class LoadData:
         return f"LoadData(chains={len(self.chains)}, rows={len(self)}, loaded={len(self._payload)})"
 
     # --------------------------------------------------------------------------------#
+    # 内部辅助方法
+    @property
+    def _isMerged(self) -> bool:
+        """索引表是否已完成合并, 已合并的索引表不含 name 列"""
+        return "name" not in self._table.columns
+
+    @staticmethod
+    def _stack(entries: List[Tuple[str, pd.DataFrame]], mode: str) -> pd.DataFrame | None:
+        """将同一工况链内的数据内容合并为单个DataFrame, 无有效条目时返回None"""
+        if not entries:
+            return None
+        if mode == "hstack":
+            # 为避免列名冲突, 添加文件名前缀
+            Listdataframe: List[pd.DataFrame] = [
+                df.set_axis([f"{Path(name).stem}#{col}" for col in df.columns], axis=1) for name, df in entries
+            ]
+            filesdata = pd.concat(Listdataframe, axis=1)
+        else:
+            filesdata = pd.concat([df for _, df in entries], axis=0, ignore_index=True)
+        return filesdata.to_frame() if isinstance(filesdata, pd.Series) else filesdata
+
+    @classmethod
+    def _empty(cls) -> Self:
+        """构建空LoadData对象, 用于无任何数据文件的场景"""
+        return cls(pd.DataFrame(columns=LoadData._tableCols), {})
+
+    def _rebased(self, chain: str) -> Self:
+        """构建工况链改写为指定值的LoadData对象, 用于Folder聚合时统一工况链"""
+        table = self._table.copy()
+        table["chain"] = chain
+        payload = {(chain, name): df for (_, name), df in self._payload.items()}
+        return type(self)(table, payload)
+
+    @staticmethod
+    def _concat(parts: List["LoadData"]) -> "LoadData":
+        """构建多个LoadData对象聚合后的LoadData对象, 用于Folder汇总加载结果"""
+        if not parts:
+            return LoadData._empty()
+        table = pd.concat([part._table for part in parts], ignore_index=True)
+        payload: Dict[Tuple[str, str], pd.DataFrame] = {}
+        for part in parts:
+            payload.update(part._payload)
+        return LoadData(table, payload)
+
+    # --------------------------------------------------------------------------------#
     # 外部用户方法
     def merge(self, mode: str = "hstack") -> Self:
         """
@@ -234,13 +279,9 @@ class LoadData:
         logger.info(f"合并完成: mode={mode}, chains={len(rows)}, files={source_count}, elapsed={consumed_time:.2f}s")
         return self
 
-    def to_Signal(self, fs: float, name: str, unit: str) -> List["Signal"]:
+    def to_Signal(self, fs: float, name: str, unit: str) -> List[Dict[str, "Signal"]]:
         """
-        将所有加载数据(每列)转换为Signal对象
-
-        每列数据独立构建一个Signal对象, 其 label 按 '{工况链}#{文件名}#{列名}' 格式生成
-        (合并后文件名为空串), 便于后续绘图与结果追踪.
-        读取状态非完成的条目(数据为None或空表)将被跳过
+        将所有加载数据(每文件/每列)转换为Signal
 
         Parameters
         ----------
@@ -253,64 +294,22 @@ class LoadData:
 
         Returns
         -------
-        List[Signal]
-            转换的Signal对象列表, 顺序与索引表一致, 不含被跳过的空数据条目
+        List[Dict[str, Signal]]
+            转换的Signal. 每文件为一个字典, 字典键为列名, 值为对应的Signal对象. 字典列表按索引表顺序排列
         """
-        Listsig: List[Signal] = []
+        Listdf = []
         for c, n, df in self:
+            Dictsig: Dict[str, Signal] = {}
+            c = c + "#" if c != "." else ""
+            n = n + "#" if n != "" else ""
             if df is not None and not df.empty:
                 for col in df.columns:
                     data = np.asarray(df[col].dropna(), copy=True)
-                    sig = Signal(
-                        axis=t_Axis(fs=fs, N=len(data)), data=data, name=name, unit=unit, label=f"{c}#{n}#{col}"
-                    )
-                    Listsig.append(sig)
-        return Listsig
-
-    # --------------------------------------------------------------------------------#
-    # 内部辅助方法
-    @property
-    def _isMerged(self) -> bool:
-        """索引表是否已完成合并, 已合并的索引表不含 name 列"""
-        return "name" not in self._table.columns
-
-    @staticmethod
-    def _stack(entries: List[Tuple[str, pd.DataFrame]], mode: str) -> pd.DataFrame | None:
-        """将同一工况链内的数据内容合并为单个DataFrame, 无有效条目时返回None"""
-        if not entries:
-            return None
-        if mode == "hstack":
-            # 为避免列名冲突, 添加文件名前缀
-            Listdataframe: List[pd.DataFrame] = [
-                df.set_axis([f"{Path(name).stem}#{col}" for col in df.columns], axis=1) for name, df in entries
-            ]
-            filesdata = pd.concat(Listdataframe, axis=1)
-        else:
-            filesdata = pd.concat([df for _, df in entries], axis=0, ignore_index=True)
-        return filesdata.to_frame() if isinstance(filesdata, pd.Series) else filesdata
-
-    @classmethod
-    def _empty(cls) -> Self:
-        """构建空LoadData对象, 用于无任何数据文件的场景"""
-        return cls(pd.DataFrame(columns=LoadData._tableCols), {})
-
-    def _rebased(self, chain: str) -> Self:
-        """构建工况链改写为指定值的LoadData对象, 用于Folder聚合时统一工况链"""
-        table = self._table.copy()
-        table["chain"] = chain
-        payload = {(chain, name): df for (_, name), df in self._payload.items()}
-        return type(self)(table, payload)
-
-    @staticmethod
-    def _concat(parts: List["LoadData"]) -> "LoadData":
-        """构建多个LoadData对象聚合后的LoadData对象, 用于Folder汇总加载结果"""
-        if not parts:
-            return LoadData._empty()
-        table = pd.concat([part._table for part in parts], ignore_index=True)
-        payload: Dict[Tuple[str, str], pd.DataFrame] = {}
-        for part in parts:
-            payload.update(part._payload)
-        return LoadData(table, payload)
+                    label = c + n + col
+                    sig = Signal(axis=t_Axis(fs=fs, N=len(data)), data=data, name=name, unit=unit, label=label)
+                    Dictsig[col] = sig
+            Listdf.append(Dictsig)
+        return Listdf
 
 
 class Files:
