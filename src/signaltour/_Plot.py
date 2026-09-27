@@ -26,7 +26,7 @@
 from ._Plot_Module._core import *
 from ._Plot_Module._ImagePlot import *
 from ._Plot_Module._LinePlot import *
-from ._Plot_Module._BasePlotPlugin import *
+from ._Plot_Module._PlotPlugin import *
 
 if __name__ == "__main__":
     from script.docstring import update_package_docstring

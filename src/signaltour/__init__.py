@@ -91,10 +91,8 @@
         - `StatsTrendAnalysis`: 信号时域统计分析类
 ## TimeFreqAnalysis: 非平稳信号时频分析模块, 提供多种时频谱图计算方法
     - class:
-        - `STFTAnalysis`: 短时傅里叶变换 (Short-Time Fourier Transform, STFT) 分析类
-        - `WVDAnalysis`: 魏格纳威利分布(Wigner-Ville Distribution, WVD) 分析类
-## WaveletAnalysis:小波分析模块, 提供连续小波、离散小波等多种小波多分辨率分析方法
-    - class:
+        - `STFTAnalysis`: 短时傅里叶变换(Short-Time Fourier Transform, STFT)分析方法
+        - `WVDAnalysis`: 魏格纳威利分布(Wigner-Ville Distribution, WVD)分析方法
         - `CWTAnalysis`: 连续小波变换 (Continuous Wavelet Transform, CWT) 分析类
         - `DWTAnalysis`: 离散小波变换 (Discrete Wavelet Transform, DWT) 分析类
 """

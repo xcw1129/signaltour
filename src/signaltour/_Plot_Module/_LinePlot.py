@@ -22,7 +22,7 @@ import numpy as np
 
 from .._Signal_Module._core import Series, Signal, Spectra
 from ._core import BasePlot
-from ._BasePlotPlugin import PeakfinderPlugin, PosNagMaskPlugin
+from ._PlotPlugin import PeakfinderPlugin, PosNagMaskPlugin
 
 # --------------------------------------------------------------------------------------------#
 # --------------------------------------------------------------------------------#
