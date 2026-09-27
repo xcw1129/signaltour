@@ -9,6 +9,7 @@
 
 __all__ = ["resample", "pad", "segment"]
 
+from copy import copy
 from typing import List, Optional
 
 import numpy as np
@@ -236,10 +237,11 @@ def segment(
     # 生成分段标志时刻列表
     seg_time = np.arange(nseg) * (nhop * sig.t_axis.dt) + sig.t_axis.t0
     # 生成分段信号
-    Listsig = []
+    template = sig.template()
+    seg_sig_list = []
     for seg_data, seg_t in zip(seg_data_list, seg_time):
-        sig_seg = sig.template()
-        sig_seg._axis = t_Axis(len(seg_data), dt=sig.t_axis.dt, t0=seg_t)
-        sig_seg._data = seg_data
-        Listsig.append(sig_seg)
-    return Listsig
+        seg_sig = copy(template)
+        seg_sig._axis = t_Axis(len(seg_data), dt=sig.t_axis.dt, t0=seg_t)
+        seg_sig._data = seg_data
+        seg_sig_list.append(seg_sig)
+    return seg_sig_list

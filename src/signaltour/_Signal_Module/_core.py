@@ -14,7 +14,7 @@ __all__ = ["Axis", "Series", "t_Axis", "f_Axis", "Signal", "Spectra"]
 
 import numbers
 import re
-from copy import deepcopy
+from copy import copy, deepcopy
 from typing import Optional, Self, Tuple
 
 import numpy as np
@@ -179,7 +179,7 @@ class Axis:
     # 外部用户方法
     def copy(self):
         """返回拷贝对象, 与原对象完全独立"""
-        return deepcopy(self)  # 确保子类可直接继承使用
+        return copy(self)  # 确保子类可直接继承使用
 
     def to_pos_index(self, key):
         """将物理索引转换为位置索引, 单点索引为浮点数, 切片索引自动右对齐"""
@@ -266,9 +266,13 @@ class Series(NDArrayOperatorsMixin):
         self.name: str = name
         self.unit: str = unit
         self.label: str = label
-        self._data: np.ndarray = np.asarray(data, copy=self._COPY_ARRAY) if data is not None else np.zeros(len(axis))
-        if self._check_data(self._data) is False:
-            raise ValueError(f"data={self._data}: 输入序列数据数组非法. 避免使用非一维数组, 长度不匹配或包含NaN值")
+        if data is not None:
+            if self._check_data(data) is False:
+                raise ValueError(f"data={data}: 输入序列数据数组非法. 避免使用非一维数组, 长度不匹配或包含NaN值")
+            else:
+                self._data = np.asarray(data, copy=self._COPY_ARRAY)
+        else:
+            self._data = np.zeros(len(axis))  # 默认初始化为0数组
 
     _COPY_ARRAY = None
 
