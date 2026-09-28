@@ -3,9 +3,8 @@
 
     - class:
         - `SpectrumAnalysis`: 平稳信号频谱分析方法类
-        - `HilbertAnalysis`: 单成分调制信号希尔伯特分析方法类
     - function:
-        - `get_window`: 生成指定窗函数的整周期采样序列
+        - `get_window`: 生成指定窗函数的单整周期采样序列
         - `find_spectralines`: 检测谱数据中的谱线类局部峰值
         - `convolveCycle`: 计算两个序列数据的循环卷积, 该卷积方式满足DFT的卷积定理
         - `convolve`: 计算两个序列数据的线性卷积
@@ -17,7 +16,6 @@ __all__ = [
     "convolveCycle",
     "convolve",
     "SpectrumAnalysis",
-    "HilbertAnalysis",
 ]
 
 from collections.abc import Callable
@@ -27,7 +25,7 @@ import numpy as np
 from scipy import fft, linalg, signal
 
 from .._Plot_Module._LinePlot import PlotFunc_spectrum
-from .._Signal_Module._core import Signal, Spectra, f_Axis
+from .._Signal_Module._core import Spectra, f_Axis
 from ._core import BaseAnalysis
 
 
@@ -44,22 +42,22 @@ def get_window(
     func: Optional[Callable] = None,
 ) -> np.ndarray:
     """
-    生成指定窗函数的整周期采样序列
+    生成指定窗函数的单整周期采样序列
 
     Parameters
     ----------
     num : int
         采样点数
-    type : str, default: "汉宁窗"
+    type : str, default="汉宁窗"
         窗函数类型, 可选:
         "矩形窗", "汉宁窗", "海明窗", "巴特利特窗", "布莱克曼窗",
         "三角窗", "高斯窗", "凯泽窗", "平顶窗", "余弦窗", "自定义窗"
     winParam : float, optional
         窗函数参数, 仅对部分窗函数有效
-    symmetric : bool, default: False
-        是否生成对称窗. 对于DFT计算加窗, 建议设置为False
+    symmetric : bool, default=False
+        是否生成对称窗. 对于DFT加窗, 建议设置为False
     padding : int, optional
-        零填充点数
+        零填充点数, 常用于DFT增强频谱频移不变性. 不指定则不进行零填充
     func : Callable, optional
         自定义窗函数
 
@@ -133,9 +131,9 @@ def find_spectralines(
     ----------
     data : np.ndarray
         谱数据
-    threshold : float, default: 0.8
+    threshold : float, default=0.8
         邻域稀疏度阈值, 输入范围: (1/sqrt(d*2+1), 1)
-    distance : float, default: 0.01
+    distance : float, default=0.01
         峰值最小间距. 若<1则表示数据总长度的比例, 若>1则表示数据点数
 
     Returns
@@ -189,7 +187,7 @@ def convolveCycle(x: np.ndarray, y: np.ndarray, method="fft") -> np.ndarray:
         序列1
     y : np.ndarray
         序列2
-    method : str, default: "fft"
+    method : str, default="fft"
         卷积计算方式, 可选: "direct", "fft"
 
     Returns
@@ -230,7 +228,7 @@ def _convolve(x: np.ndarray, y: np.ndarray, method="fft") -> np.ndarray:
         序列1
     y : np.ndarray
         序列2
-    method : str, default: "fft"
+    method : str, default="fft"
         卷积计算方式, 可选: "direct", "fft"
 
     Returns
@@ -259,7 +257,7 @@ def convolve(x: np.ndarray, y: np.ndarray, mode: str = "full") -> np.ndarray:
         序列1
     y : np.ndarray
         序列2
-    mode : str, default: "full"
+    mode : str, default="full"
         卷积结果长度模式, 可选: "full", "same", "valid"
 
     Returns
@@ -286,7 +284,7 @@ class SpectrumAnalysis(BaseAnalysis):
 
     Attributes
     ----------
-    Sig : Signal
+    sig : Signal
         待分析信号
     isPlot : bool
         是否绘制分析结果图
@@ -317,44 +315,8 @@ class SpectrumAnalysis(BaseAnalysis):
         计算希尔伯特包络幅值谱
     """
 
-    def __init__(
-        self,
-        Sig: Signal,
-        isLinked: bool = True,
-        isPlot: bool = False,
-        **kwargs,
-    ):
-        """
-        平稳信号频谱分析方法类
-
-        Parameters
-        ----------
-        Sig : Signal
-            待分析信号
-        isLinked : bool, default: True
-            是否链接信号原始数据
-        isPlot : bool, default: False
-            是否绘制分析结果图
-        """
-        self.Sig = Sig if isLinked else Sig.copy()
-        self.isPlot = isPlot
-        self.plot_kwargs = kwargs
-        self.plot_kwargs.setdefault("isFindPeaks", True)  # 默认启用谱线峰值标记
-
     @staticmethod
     def _dft(data: np.ndarray) -> np.ndarray:
-        """
-        计算序列数据的离散傅里叶变换
-
-        该方法仅用于演示DFT计算过程, 实际计算使用 Spectrum.dft
-
-        输入参数data的长度推荐不超过16384, 避免计算过程占用4GB以上内存
-
-        Returns
-        -------
-        np.ndarray
-            DFT结果
-        """
         N = len(data)
         n = np.arange(N)  # 时间序列索引
         k = n.reshape((N, 1))  # 频率序列索引
@@ -366,18 +328,6 @@ class SpectrumAnalysis(BaseAnalysis):
 
     @staticmethod
     def _idft(data: np.ndarray) -> np.ndarray:
-        """
-        计算序列数据的逆离散傅里叶变换
-
-        该方法仅用于演示IDFT计算过程, 实际计算使用 Spectrum.idft
-
-        输入参数data的长度推荐不超过16384, 避免计算过程占用4GB以上内存
-
-        Returns
-        -------
-        np.ndarray
-            IDFT结果
-        """
         N = len(data)
         n = np.arange(N)  # 时间序列索引
         k = n.reshape((N, 1))  # 频率序列索引
@@ -402,11 +352,11 @@ class SpectrumAnalysis(BaseAnalysis):
     @BaseAnalysis._plot(PlotFunc_spectrum)
     def ft(self, symmetric: bool = False) -> Spectra:
         """
-        计算能量信号在0~N/2*Δf范围内傅里叶变换的离散近似
+        计算信号傅里叶变换的离散近似
 
         Parameters
         ----------
-        symmetric : bool, default: False
+        symmetric: bool, default=False
             是否生成零频率中心的对称频谱
 
         Returns
@@ -415,52 +365,52 @@ class SpectrumAnalysis(BaseAnalysis):
             傅里叶变换谱
         """
         # 计算傅里叶变换: FT=DFT*Δt
-        X_f = SpectrumAnalysis.dft(self.Sig.data) * self.Sig.t_axis.dt
+        X_f = SpectrumAnalysis.dft(self.sig.data) * self.sig.t_axis.dt
         # 构造频谱对象
         Spc = Spectra(
-            axis=self.Sig.t_axis.to_f_axis(),
+            axis=self.sig.t_axis.to_f_axis(),
             data=X_f,
             name="幅值密度",
-            unit=self.Sig.unit + "/Hz",
-            label=self.Sig.label,
+            unit=self.sig.unit + "/Hz",
+            label=self.sig.label,
         )
         Spc.data = np.abs(Spc.data)
         if symmetric:
             Spc.data = fft.fftshift(Spc.data)
-            freq = fft.fftshift(fft.fftfreq(len(Spc), d=self.Sig.t_axis.dt))
+            freq = fft.fftshift(fft.fftfreq(len(Spc), d=self.sig.t_axis.dt))
             Spc.f_axis.f0, Spc.f_axis.df = freq[0], freq[1] - freq[0]
         return Spc
 
     @BaseAnalysis._plot(PlotFunc_spectrum)
     def cft(self, winType: str = "汉宁窗", padTimes: int = 3) -> Spectra:
         """
-        计算功率信号在0~N/2*Δf范围内傅里叶级数系数的离散近似
+        计算周期信号的傅里叶级数幅值谱
 
         Parameters
         ----------
-        winType : str, default: "汉宁窗"
-            加窗类型，可选："矩形窗", "汉宁窗", "海明窗", "巴特利特窗", "布莱克曼窗", "自定义窗"
-        padTimes : int, default: 3
+        winType: str, default="汉宁窗"
+            加窗类型, 可选："矩形窗", "汉宁窗", "海明窗", "巴特利特窗", "布莱克曼窗", "自定义窗"
+        padTimes: int, default=3
             零填充延拓倍数, 信号长度在计算DFT前将延长为原来的 (1+padTimes) 倍, 以增强频谱频移不变性
 
         Returns
         -------
         Spectra
-            傅里叶级数系数谱
+            幅值谱计算结果
         """
-        win = get_window(num=len(self.Sig), type=winType, padding=padTimes * len(self.Sig) // 2)
+        win = get_window(num=len(self.sig), type=winType, padding=padTimes * len(self.sig) // 2)
         scale = 1 / np.mean(win)  # 幅值补偿因子
         # 计算傅里叶级数系数: CFT=DFT/N
-        data_pad = np.pad(self.Sig.data, padTimes * len(self.Sig) // 2, mode="constant")
+        data_pad = np.pad(self.sig.data, padTimes * len(self.sig) // 2, mode="constant")
         X_k = SpectrumAnalysis.dft(data_pad * win) / len(data_pad)
         X_k = X_k * scale  # 幅值补偿
         # 构造频谱对象
         Spc = Spectra(
-            axis=f_Axis(len(X_k), df=self.Sig.t_axis.to_f_axis().df / (1 + padTimes)),
+            axis=f_Axis(len(X_k), df=self.sig.t_axis.to_f_axis().df / (1 + padTimes)),
             data=X_k,
             name="幅值",
-            unit=self.Sig.unit,
-            label=self.Sig.label,
+            unit=self.sig.unit,
+            label=self.sig.label,
         )
         Spc.data = np.abs(Spc.data)
         Spc.halfCut()
@@ -469,17 +419,17 @@ class SpectrumAnalysis(BaseAnalysis):
     @BaseAnalysis._plot(PlotFunc_spectrum)
     def psd(self, averageTimes: int = 10, type: str = "功率") -> Spectra:
         """
-        估计带噪声功率信号在0~N/2*Δf范围内的功率分布
+        估计平稳随机信号的功率谱
 
-        功率谱中的峰值高度是信号震荡成分均方根幅值的估计值
+        功率谱中的峰值高度是信号振荡成分均方根幅值的估计值
 
         功率谱中的平坦部分平均是白噪声功率的估计值
 
         Parameters
         ----------
-        averageTimes : int, default: 10
+        averageTimes: int, default=10
             功率谱平均次数. 平均次数越多, 频谱估计越稳定, 但谱分辨率越低. 推荐值范围: 5~20
-        type : str, default: "功率"
+        type: str, default="功率"
             功率谱类型, 可选: '功率', '功率密度'
 
         Returns
@@ -491,11 +441,11 @@ class SpectrumAnalysis(BaseAnalysis):
         --------
         - scipy.signal.welch
         """
-        nperseg = max(64, len(self.Sig) // averageTimes)  # 每段长度
+        nperseg = max(64, len(self.sig) // averageTimes)  # 每段长度
         # 计算功率谱
         freq, P_k = signal.welch(
-            self.Sig.data,
-            fs=self.Sig.t_axis.fs,
+            self.sig._data,
+            fs=self.sig.t_axis.fs,
             window="boxcar",
             nperseg=nperseg,
             noverlap=nperseg // 2,
@@ -509,149 +459,8 @@ class SpectrumAnalysis(BaseAnalysis):
             axis=f_Axis(len(P_k), df=freq[1] - freq[0], f0=freq[0]),
             data=P_k,
             name="功率" if type == "功率" else "功率密度",
-            unit=self.Sig.unit + ("^2" if type == "功率" else "^2/Hz"),
-            label=self.Sig.label,
+            unit=self.sig.unit + ("^2" if type == "功率" else "^2/Hz"),
+            label=self.sig.label,
         )
         Spc.halfCut()
         return Spc
-
-    @BaseAnalysis._plot(PlotFunc_spectrum)
-    def psdDiff(
-        self,
-        Sig_ref: Signal,
-        averageTimes: int = 10,
-        mode: str = "absolute",
-    ) -> Spectra:
-        """
-        计算与参考信号的差分功率谱
-
-        Parameters
-        ----------
-        Sig_ref : Signal
-            参考信号
-        averageTimes : int, default: 10
-            功率谱平均次数. 平均次数越多, 频谱估计越稳定, 但谱分辨率越低. 推荐值范围: 5~20
-        mode : Literal["absolute", "relative", "log"], default: "absolute"
-            计算模式:
-            - "absolute": 绝对差值 (Spc2 - Spc1)
-            - "relative": 相对变化率 (Spc2 - Spc1) / Spc1
-            - "log": 对数差分 (dB), 10 * log10(Spc2 / Spc1)
-        """
-        # 计算两个信号的功率谱
-        Spc1 = SpectrumAnalysis(self.Sig).psd(averageTimes=averageTimes)
-        Spc2 = SpectrumAnalysis(Sig_ref).psd(averageTimes=averageTimes)
-
-        if mode == "absolute":
-            Spc_diff = Spc2 - Spc1
-            Spc_diff.name = "绝对差分功率"
-        elif mode == "relative":
-            Spc_diff = (Spc2 - Spc1) / (Spc1 + 1e-12)  # 避免除零
-            Spc_diff.name = "功率变化率"
-            Spc_diff.unit = "%"
-        elif mode == "log":
-            # 计算 dB 差值: 10 * log10(P2/P1)
-            diff_data = 10 * np.log10(Spc2.data / (Spc1.data + 1e-12) + 1e-12)
-            Spc_diff = Spc2.template(diff_data)
-            Spc_diff.name = "对数差分功率"
-            Spc_diff.unit = "dB"
-        else:
-            raise ValueError(f"计算模式`mode`不支持. 可选模式: 'absolute', 'relative', 'log'. 当前`mode`={mode}")
-
-        return Spc_diff
-
-
-# --------------------------------------------------------------------------------------------#
-class HilbertAnalysis(BaseAnalysis):
-    """
-    单成分调制信号希尔伯特分析方法类
-
-    Attributes
-    ----------
-    Sig : Signal
-        待分析信号
-    isPlot : bool
-        是否绘制分析结果图
-    plot_kwargs : dict
-        自定义绘图参数
-
-    Methods
-    -------
-    - analytic() -> Signal
-        计算解析信号
-
-    - amplitude() -> Signal
-        计算包络幅值
-
-    - phase() -> Signal
-        计算瞬时相位
-
-    - frequency() -> Signal
-        计算瞬时频率
-
-    - envelopeSpectrum() -> Spectra
-        计算包络幅值谱
-
-    """
-
-    def __init__(
-        self,
-        Sig: Signal,
-        isLinked: bool = True,
-        isPlot: bool = False,
-        **kwargs,
-    ):
-        """
-        单成分调制信号希尔伯特分析方法类
-
-        Parameters
-        ----------
-        Sig : Signal
-            待分析信号
-        isLinked : bool, default: True
-            是否链接信号原始数据
-        isPlot : bool, default: False
-            是否绘制分析结果图
-        """
-        self.Sig: Signal = Sig if isLinked else Sig.copy()
-        self.isPlot: bool = isPlot
-        self.plot_kwargs: dict = kwargs
-        self.plot_kwargs.setdefault("isFindPeaks", True)  # 默认启用谱线峰值标记
-
-    def analytic(self) -> Signal:
-        """计算解析信号"""
-        analytic: np.ndarray = signal.hilbert(self.Sig.data)
-        Sig_analytic: Signal = self.Sig.template(analytic)
-        Sig_analytic.name = "解析幅值"
-        return Sig_analytic
-
-    def amplitude(self) -> Signal:
-        """计算包络幅值"""
-        Sig_analytic: Signal = self.analytic()
-        amplitude: np.ndarray = np.abs(Sig_analytic.data)
-        Sig_amplitude: Signal = self.Sig.template(amplitude)
-        Sig_amplitude.name = "包络幅值"
-        return Sig_amplitude
-
-    def phase(self) -> Signal:
-        """计算瞬时相位"""
-        Sig_analytic: Signal = self.analytic()
-        phase: np.ndarray = np.angle(Sig_analytic.data)
-        Sig_phase: Signal = self.Sig.template(phase)
-        Sig_phase.name, Sig_phase.unit = "瞬时相位", "rad"
-        return Sig_phase
-
-    def frequency(self) -> Signal:
-        """计算瞬时频率"""
-        Sig_phase: Signal = self.phase()
-        # 计算相位的一阶差分并除以采样间隔得到瞬时频率
-        insFreq = np.gradient(Sig_phase.data, self.Sig.t_axis.dt) / (2 * np.pi)
-        Sig_freq = self.Sig.template(insFreq)
-        Sig_freq.name, Sig_freq.unit = "瞬时频率", "Hz"
-        return Sig_freq
-
-    def envelopeSpectrum(self) -> Spectra:
-        """计算包络幅值谱"""
-        Sig_amplitude: Signal = self.amplitude()
-        Spc_envelope: Spectra = SpectrumAnalysis(Sig_amplitude).cft(padTimes=3)
-        Spc_envelope.name = "包络幅值"
-        return Spc_envelope

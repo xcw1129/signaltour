@@ -30,7 +30,7 @@ class BaseAnalysis:
 
     Attributes
     ----------
-    Sig : Signal
+    sig : Signal
         待分析信号
     isPlot : bool
         是否绘制分析结果图
@@ -40,8 +40,7 @@ class BaseAnalysis:
 
     def __init__(
         self,
-        Sig: Signal,
-        isLinked: bool = True,
+        sig: Signal,
         isPlot: bool = False,
         **kwargs,
     ):
@@ -50,14 +49,12 @@ class BaseAnalysis:
 
         Parameters
         ----------
-        Sig : Signal
+        sig : Signal
             待分析信号
-        isLinked : bool, default: True
-            是否链接信号原始数据
         isPlot : bool, default: False
             是否绘制分析结果图
         """
-        self.Sig = Sig if isLinked else Sig.copy()
+        self.sig = sig
         self.isPlot = isPlot
         self.plot_kwargs = kwargs
 

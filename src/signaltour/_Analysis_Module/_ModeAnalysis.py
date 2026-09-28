@@ -371,7 +371,7 @@ class EMDAnalysis(BaseAnalysis):
             传递给绘图模块的其他关键字参数, 若未提供 `ylim`, 将根据输入信号自动设置合理范围。
         """
         # Analysis类初始化
-        super().__init__(Sig=Sig, isPlot=isPlot, **kwargs)
+        super().__init__(sig=Sig, isPlot=isPlot, **kwargs)
         # EMDAnalysis子类特有属性
         self.sifting_rounds = sifting_rounds
         self.sifting_itpMethod = sifting_itpMethod
@@ -400,7 +400,7 @@ class EMDAnalysis(BaseAnalysis):
             模态信号序列; 列表最后一项为残余模态
         """
         Sig_imf_list = []
-        Sig_res = self.Sig.copy()
+        Sig_res = self.sig.copy()
         Sig_res.label = "残差-0"
         # 对残差进行循环筛选
         for i in range(decNum):
@@ -411,7 +411,7 @@ class EMDAnalysis(BaseAnalysis):
             # 更新残余模态标签
             Sig_res.label = "残差-" + str(i + 1)
             # 判断分解终止条件
-            if np.ptp(Sig_res) <= weakness * np.ptp(self.Sig) or Sig_imf.label == "趋势模态":
+            if np.ptp(Sig_res) <= weakness * np.ptp(self.sig) or Sig_imf.label == "趋势模态":
                 Sig_res.label = "残差"
                 break  # 如果Sig_res标签不含数字，则表示分解有效终止
         Sig_imf_list.append(Sig_res)  # 将残差也加入返回列表，便于绘图
@@ -604,7 +604,7 @@ class VMDAnalysis(BaseAnalysis):
             收敛判据阈值, 当相邻迭代模态变化的相对范数之和低于该值时终止
         """
         # Analysis类初始化
-        super().__init__(Sig=Sig, isPlot=isPlot, **kwargs)
+        super().__init__(sig=Sig, isPlot=isPlot, **kwargs)
         # VMDAnalysis子类特有属性
         self.initFc_method = initFc_method
         self.getTrend = getTrend
@@ -642,9 +642,9 @@ class VMDAnalysis(BaseAnalysis):
         # ------------------------------------------------------------------------#
         # 数据双边延拓缓解边界效应
         if self.isExtend:
-            Sig_extend = pad(Sig=self.Sig, length=len(self.Sig) // 2, mode="mirror")
+            Sig_extend = pad(Sig=self.sig, length=len(self.sig) // 2, mode="mirror")
         else:
-            Sig_extend = self.Sig
+            Sig_extend = self.sig
         # ------------------------------------------------------------------------#
         # 准备频域优化迭代输入
         analytic = signal.hilbert(Sig_extend)
@@ -652,24 +652,24 @@ class VMDAnalysis(BaseAnalysis):
         Spc_extend = Spectra(
             Sig_extend.t_axis.to_f_axis(),
             X_k,
-            name=self.Sig.name,
-            unit=self.Sig.unit,
-            label=self.Sig.label,
+            name=self.sig.name,
+            unit=self.sig.unit,
+            label=self.sig.label,
         )
         # 初始化优化变量
         Spc_mode_list = [
             Spectra(
                 Sig_extend.t_axis.to_f_axis(),
-                name=self.Sig.name,
-                unit=self.Sig.unit,
+                name=self.sig.name,
+                unit=self.sig.unit,
                 label=f"模态-{i + 1}: 0",
             )
             for i in range(decNum)
         ]
         Spc_lambda = Spectra(
             Sig_extend.t_axis.to_f_axis(),
-            name=self.Sig.name,
-            unit=self.Sig.unit,
+            name=self.sig.name,
+            unit=self.sig.unit,
             label="拉格朗日乘子",
         )
         # ------------------------------------------------------------------------#
@@ -689,8 +689,8 @@ class VMDAnalysis(BaseAnalysis):
             Spc_trend = Spectra(
                 Sig_extend.t_axis.to_f_axis(),
                 X_k_trend,
-                name=self.Sig.name,
-                unit=self.Sig.unit,
+                name=self.sig.name,
+                unit=self.sig.unit,
                 label="趋势模态",
             )
             Spc_mode_list[0] = Spc_trend
@@ -726,13 +726,13 @@ class VMDAnalysis(BaseAnalysis):
         for k in range(decNum):
             mode = np.real(fft.ifft(Spc_mode_list[k].data)) * len(Sig_extend)  # 反归一化
             if self.isExtend:
-                mode = mode[len(self.Sig) // 2 : -len(self.Sig) // 2]
+                mode = mode[len(self.sig) // 2 : -len(self.sig) // 2]
             Sig_model_list.append(
                 Signal(
-                    self.Sig.t_axis.copy(),
+                    self.sig.t_axis.copy(),
                     mode,
-                    name=self.Sig.name,
-                    unit=self.Sig.unit,
+                    name=self.sig.name,
+                    unit=self.sig.unit,
                     label=_make_label(Spc_mode_list[k].label, operation="getBase"),
                 )
             )

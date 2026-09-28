@@ -71,7 +71,7 @@ class StatsTrendAnalysis(BaseAnalysis):
         dict
             包含各项统计指标名称和值的字典
         """
-        return {name: func(self.Sig.data) for name, func in self._stats_func_dict.items()}
+        return {name: func(self.sig.data) for name, func in self._stats_func_dict.items()}
 
     def distribution(self, bins: int = 100, density: bool = True) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -89,7 +89,7 @@ class StatsTrendAnalysis(BaseAnalysis):
         Tuple[np.ndarray, np.ndarray]
             (概率密度/计数, 幅值分界点)
         """
-        return np.histogram(self.Sig.data, bins=bins, density=density)
+        return np.histogram(self.sig.data, bins=bins, density=density)
 
     @BaseAnalysis._plot(PlotFunc_waveform)
     def trend(self, type: str, segNum: Optional[int] = None, tperseg: Optional[float] = None) -> Series:
@@ -113,16 +113,16 @@ class StatsTrendAnalysis(BaseAnalysis):
         """
         # 信号滑动切片
         seg_data_list, seg_time = segment(
-            self.Sig, segNum=segNum, tperseg=tperseg, pad_mode="edge"
+            self.sig, segNum=segNum, tperseg=tperseg, pad_mode="edge"
         )  # 默认50%重叠, 边界常数填充
         # 计算所有分段统计值
         if type not in self._stats_func_dict:
             raise ValueError(f"type={type}: 不支持的统计值类型")
         stat_values = np.apply_along_axis(self._stats_func_dict[type], axis=1, arr=seg_data_list)
-        dt = seg_time[1] - seg_time[0] if len(seg_time) > 1 else self.Sig.t_axis.dt
+        dt = seg_time[1] - seg_time[0] if len(seg_time) > 1 else self.sig.t_axis.dt
         Srs_stats = Series(
             t_Axis(len(stat_values), t0=seg_time[0], dt=dt),
             stat_values,
-            label=f"{self.Sig.label}滑动{type}",
+            label=f"{self.sig.label}滑动{type}",
         )  # 统计值量纲不确定, 不设置name和unit属性
         return Srs_stats

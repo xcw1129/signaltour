@@ -75,11 +75,11 @@ class STFTAnalysis(BaseAnalysis):
             # df_seg/df=(segNum-1)/2
             if df is not None:
                 df /= 3  # 考虑到谱泄露, 适当提高频率分辨率要求
-                segNum_max = int((df / self.Sig.t_axis.to_f_axis().df) * 2 + 1)
+                segNum_max = int((df / self.sig.t_axis.to_f_axis().df) * 2 + 1)
                 segNum = segNum_max
             # dt_seg/dt=2N/(segNum-1)
             if dt is not None:
-                segNum_min = int((2 * len(self.Sig)) / (dt * self.Sig.t_axis.fs) + 1)
+                segNum_min = int((2 * len(self.sig)) / (dt * self.sig.t_axis.fs) + 1)
                 segNum = segNum_min
             if df is not None and dt is not None:
                 if segNum_min > segNum_max:
@@ -124,7 +124,7 @@ class STFTAnalysis(BaseAnalysis):
         auto_segNum = self._get_segNum(df=df, dt=dt)
         segNum = auto_segNum if segNum is None else segNum
         # 信号分段切片延拓与加窗
-        seg_sig_list = segment(self.Sig, nseg=segNum, overlap=0.5)
+        seg_sig_list = segment(self.sig, nseg=segNum, overlap=0.5)
         time = []
         segments = []
         for seg_sig in seg_sig_list:
@@ -136,7 +136,7 @@ class STFTAnalysis(BaseAnalysis):
         segments = np.array(segments)
         # 单独计算所有分段的FFT, 此时分段存在线性相移项
         Sf = fft.fft(segments, axis=1)
-        freq = np.linspace(0, self.Sig.t_axis.fs, Sf.shape[1], endpoint=False)
+        freq = np.linspace(0, self.sig.t_axis.fs, Sf.shape[1], endpoint=False)
         if self.isPlot:
             return time, freq[: Sf.shape[1] // 2], 2 * np.abs(Sf[:, : Sf.shape[1] // 2])
         return time, freq, Sf
@@ -182,11 +182,11 @@ class WVDAnalysis(BaseAnalysis):
         # 根据要求的时间分辨率计算nhop
         nhop = 1
         if dt is not None:
-            nhop = max(1, int(dt * self.Sig.t_axis.fs))
-            nhop = min(nhop, len(self.Sig) // 10)  # 限制最大跳步
+            nhop = max(1, int(dt * self.sig.t_axis.fs))
+            nhop = min(nhop, len(self.sig) // 10)  # 限制最大跳步
         # 准备WVD参数
-        N = len(self.Sig)
-        analytic = signal.hilbert(self.Sig.data - np.mean(self.Sig.data))  # 求解析信号
+        N = len(self.sig)
+        analytic = signal.hilbert(self.sig.data - np.mean(self.sig.data))  # 求解析信号
         analytic_left = np.pad(analytic, (N, 0), "constant")  # 左侧补零
         analytic_right = np.pad(analytic, (0, N), "constant")  # 右侧补零
         # 组合时延数据矩阵
@@ -199,8 +199,8 @@ class WVDAnalysis(BaseAnalysis):
             Wf[n_tau, :] = seg[::nhop]  # 跨步长采样
         # 沿时延轴FFT
         Wf = (fft.fft(Wf, axis=0).real / N).T  # 对0维(时延轴)做FFT, 转置后0维为时间轴, 1维为频率轴
-        time = self.Sig.t_axis()[::nhop]
-        freq = np.arange(N) * (self.Sig.t_axis.to_f_axis().df / 2)
+        time = self.sig.t_axis()[::nhop]
+        freq = np.arange(N) * (self.sig.t_axis.to_f_axis().df / 2)
         return time, freq, Wf
 
 
@@ -452,18 +452,18 @@ class CWTAnalysis(BaseAnalysis):
             时间轴, 频率轴, CWT谱矩阵
         """
         # 生成离散尺度轴
-        flow = 10 * self.Sig.t_axis.to_f_axis().df if flow is None else flow
-        fhigh = self.Sig.t_axis.fs / 2 if fhigh is None else fhigh
+        flow = 10 * self.sig.t_axis.to_f_axis().df if flow is None else flow
+        fhigh = self.sig.t_axis.fs / 2 if fhigh is None else fhigh
         ratio = fhigh / flow
         j = int(np.log2(ratio)) + 1
         scale = CWTAnalysis.get_scale(b=2, j=j, v=nperoctave)  # s<=1
         # 生成基小波的离散尺度采样序列
-        param.update({"fc": flow / self.Sig.t_axis.to_f_axis().df})  # 归一化频率
+        param.update({"fc": flow / self.sig.t_axis.to_f_axis().df})  # 归一化频率
         wavelets = CWTAnalysis.get_wavelets_discrete(
             type=wavelet,
             param=param,
             scale=scale,
-            N=len(self.Sig),
+            N=len(self.sig),
             normalized="幅值",  # 保持与STFT时频谱一致的幅值尺度
             includeScaling=includeScaling,
         )
@@ -471,14 +471,14 @@ class CWTAnalysis(BaseAnalysis):
         if includeScaling:
             freq = np.hstack([0, freq])
 
-        time: np.ndarray = self.Sig.t_axis()
+        time: np.ndarray = self.sig.t_axis()
         # 去除中心频率超出fn的尺度
-        validIdx = np.where(freq <= self.Sig.t_axis.fs / 2)[0]
+        validIdx = np.where(freq <= self.sig.t_axis.fs / 2)[0]
         wavelets, freq = wavelets[validIdx, :], freq[validIdx]
         # ------------------------------------------------------------------------#
         # 滤波法计算CWT谱矩阵: 兼容复小波和实小波
         # 1. 预计算信号的FFT
-        data_fft = fft.fft(self.Sig._data)
+        data_fft = fft.fft(self.sig._data)
         # 2. 预计算所有小波核的FFT (同时计算, 利用axis=1向量化)
         wavelets_fft = fft.fft(np.conj(np.flip(wavelets, axis=1)), axis=1)
         # 3. 频域相乘 (利用广播: (N,) * (M, N) -> (M, N))
@@ -696,11 +696,11 @@ class DWTAnalysis(BaseAnalysis):
         for i, data in enumerate(coeffs):
             if i == level:
                 label = f"近似系数{level}"
-                dt = self.Sig.t_axis.dt * (2**level)
+                dt = self.sig.t_axis.dt * (2**level)
             else:
                 label = f"细节系数{i + 1}"
-                dt = self.Sig.t_axis.dt * (2 ** (i + 1))
-            Sig_deco = Signal(t_Axis(N=len(data), dt=dt), data, name=self.Sig.name, unit=self.Sig.unit, label=label)
+                dt = self.sig.t_axis.dt * (2 ** (i + 1))
+            Sig_deco = Signal(t_Axis(N=len(data), dt=dt), data, name=self.sig.name, unit=self.sig.unit, label=label)
             SigList_deco.append(Sig_deco)
         return SigList_deco
 
@@ -718,7 +718,7 @@ class DWTAnalysis(BaseAnalysis):
         h, g = DWTAnalysis.get_cmf_coeff(wavelet)
         # 递归分解
         coeffs = []
-        current_a = self.Sig.data  # 初始近似系数为原始信号, fn远高于信号上限频率成分时误差可忽略不计
+        current_a = self.sig.data  # 初始近似系数为原始信号, fn远高于信号上限频率成分时误差可忽略不计
         for i in range(level):
             a, d = self.deco_once(current_a, h, g, downsampled=True)
             coeffs.append(d)
