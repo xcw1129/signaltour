@@ -82,7 +82,9 @@
 
 ### 5.1 Axis
 
-- `Axis` 只维护 `N`、`_dx`、`_x0`，坐标数据按需生成；不要在子类中重复存储坐标数组。
+- `Axis` 只维护 `_N`、`_dx`、`_x0`，坐标数据按需生成；不要在子类中重复存储坐标数组。
+- `N` 是只读属性，`T/F` 等会改变长度的 setter 已删除；`fs/dt/t0/df/f0` 等不改变长度的 setter 保留。
+- `Axis.is_compatible(other)` 只比较 `_dx` 和 `unit`，不比较 `_x0`、长度或具体子类类型。
 - `Axis.lim` 是半开区间边界 `(x0, x0 + N*dx)`，不是最后一个采样点；绘图和切片逻辑依赖这一语义。
 - `t_Axis` 由 `fs`/`dt` 与 `N`/`T` 中恰好两个独立参数确定；`t0` 默认 0。
 - `f_Axis` 由 `N`、`df`、`F` 中恰好两个参数确定。
@@ -93,7 +95,8 @@
 - `Series` 必须满足“一维数据、长度与坐标轴一致、不含 NaN”；这些约束由 `_check_data` 集中校验。
 - `Series.data` 返回只读视图，公共代码通过 `.data` 读取；库内部需要高性能或原地写入时使用 `._data`，但要明确说明副作用。
 - `Series` 的 `name` 表示物理量名称，`unit` 表示单位，`label` 表示实例标签。绘图标题和图例主要使用这些元信息。
-- 数值运算通过 NumPy mixin 实现，结果在形状和数值 dtype 兼容时通过 `template()` 保持 `Signal`/`Spectra` 类型与元信息。新增运算逻辑时先验证类型保持行为。
+- 数值运算通过 NumPy mixin 实现：`__array_ufunc__` 校验所有 `Series` 操作数的轴兼容性，并在形状和数值 dtype 兼容时通过 `template()` 保持类型与元信息。
+- `__array_function__` 只把顶层 `Series` 参数替换为 `_data`，并直接返回 NumPy 原始结果，不自动包装为 `Signal`/`Spectra`。
 - `Signal.t_axis` 是 `_axis` 的别名，`Spectra.f_axis` 同理。
 - `Spectra.halfCut()` 是原地修改，会裁剪单边谱并把非直流幅值乘 2。调用前确认是否需要保留原对象。
 - `Signal.to_Spectra()` 返回矩形窗、无零填充的 `Spectra`，供快速查看和绘图；需要更完整的谱分析时使用 `SpectrumAnalysis`。
