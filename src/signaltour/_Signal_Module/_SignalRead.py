@@ -51,19 +51,7 @@ ReadStatus: TypeAlias = Literal[
 # ----------------------------------------------------------------#
 class LoadData:
     """
-    数据加载结果类, 面向后续数据分析统一承载数据文件索引与数据内容
-
-    该类将数据从文件系统中抽象出来, 不保留任何文件路径信息, 仅以工况链与文件名标识数据
-
-    索引表在 Files 注册表的基础上扩展: chain 标识工况链, status 标识读取状态, attrs 记录读取元数据
-
-    Attributes
-    ----------
-    table : pd.DataFrame
-        数据文件索引表, 单数据文件即一行, 列为: chain, name, size[MB], modifiedTime, status, attrs
-        合并后转为工况链索引表, 单工况链即一行, 列中不含 name
-    chains : List[str]
-        索引表中出现过的工况链列表
+    数据加载结果类, 面向后续信号分析统一承载数据文件索引与数据内容
 
     Methods
     -------
@@ -100,7 +88,7 @@ class LoadData:
         self, table: pd.DataFrame, payload: Dict[Tuple[str, str], pd.DataFrame]
     ) -> None:
         """
-        数据加载结果类, 面向后续数据分析统一承载数据文件索引与数据内容
+        数据加载结果类, 面向后续信号分析统一承载数据文件索引与数据内容
 
         Parameters
         ----------
@@ -115,25 +103,14 @@ class LoadData:
         self._payload: Dict[Tuple[str, str], pd.DataFrame] = payload
 
     # --------------------------------------------------------------------------------#
-    # 动态可读属性
-    @property
-    def table(self) -> pd.DataFrame:
-        """数据文件索引表, 单数据文件即一行, 仅包含元信息不包含数据内容"""
-        return self._table
-
-    @property
-    def chains(self) -> List[str]:
-        """索引表中出现过的工况链列表, 按索引表顺序去重"""
-        return self._table["chain"].unique().tolist()
-
-    # --------------------------------------------------------------------------------#
     # Python特性支持
+    def __call__(self) -> pd.DataFrame:
+        return self._table.copy()
+
     def __len__(self) -> int:
-        """索引表行数, 未合并时为数据文件数量, 合并后为工况链数量"""
         return len(self._table)
 
     def __iter__(self) -> Iterator[Tuple[str, str, Optional[pd.DataFrame]]]:
-        """迭代器, 按索引表顺序遍历(工况链, 文件名, 数据内容), 合并后文件名恒为空串, 无数据条目为None"""
         names = (
             [""] * len(self._table) if self._isMerged else self._table["name"].tolist()
         )
@@ -141,51 +118,26 @@ class LoadData:
             yield chain, name, self._payload.get((chain, name))
 
     def __getitem__(self, item: int | slice | str | Tuple[str, str]) -> Self:
-        """
-        支持整数、切片、字符串与二元组索引, 均返回子LoadData对象
-
-        整数与切片基于索引表行序索引; 字符串视为索引表的 pandas query 表达式;
-        二元组 (工况链, 文件名) 精确匹配单条已加载数据, 其中合并后文件名恒为空串
-
-        Parameters
-        ----------
-        item : int | slice | str | Tuple[str, str]
-            整数与切片按索引表行序, 字符串为 pandas query 表达式, 二元组为 (工况链, 文件名)
-
-        Returns
-        -------
-        Self
-            筛选后的子LoadData对象; 无匹配数据时返回空对象
-
-        Raises
-        ------
-        KeyError
-            二元组未找到对应已加载数据, 或索引类型不受支持
-        ValueError
-            query 表达式无效
-        IndexError
-            整数索引越界
-
-        Examples
-        --------
-        >>> loaddata[0]
-        >>> loaddata[0:2]
-        >>> loaddata["chain == 'testA/case1'"]
-        >>> loaddata["status == '失败'"]
-        >>> loaddata["`size[MB]` > 1.0"]
-        >>> loaddata[('testA/case1', 'data1.csv')]  # 未合并时按文件名取数据
-        >>> loaddata[('testA/case1', '')]           # 合并后文件名恒为空串
-        """
         # 1. 整数与切片索引 (基于索引表行序)
         if isinstance(item, (int, slice)):
-            table = self._table.iloc[item] if isinstance(item, slice) else self._table.iloc[[item]]
+            table = (
+                self._table.iloc[item]
+                if isinstance(item, slice)
+                else self._table.iloc[[item]]
+            )
             return self._subset(table)
         # ------------------------------------------------------------------------#
         # 2. 二元组索引 (工况链, 文件名)
-        elif isinstance(item, tuple) and len(item) == 2 and all(isinstance(value, str) for value in item):
+        elif (
+            isinstance(item, tuple)
+            and len(item) == 2
+            and all(isinstance(value, str) for value in item)
+        ):
             chain, name = item
             if item not in self._payload:
-                raise KeyError(f"key={item}: 未找到对应的数据内容, 可检查table中的读取状态")
+                raise KeyError(
+                    f"key={item}: 未找到对应的数据内容, 可检查table中的读取状态"
+                )
             mask = self._table["chain"] == chain
             if not self._isMerged:
                 mask &= self._table["name"] == name
@@ -199,20 +151,17 @@ class LoadData:
                 raise ValueError(f"query={item}: 索引表达式无效, {error}") from error
             return self._subset(table)
         else:
-            raise KeyError("LoadData 索引仅支持整数、切片、字符串(query表达式)和二元组(工况链, 文件名)")
-
-    def __repr__(self) -> str:
-        return f"LoadData(chains={len(self.chains)}, rows={len(self)}, loaded={len(self._payload)})"
+            raise KeyError(
+                "LoadData 索引仅支持整数、切片、字符串(query表达式)和二元组(工况链, 文件名)"
+            )
 
     # --------------------------------------------------------------------------------#
     # 内部辅助方法
     @property
     def _isMerged(self) -> bool:
-        """索引表是否已完成合并, 已合并的索引表不含 name 列"""
         return "name" not in self._table.columns
 
     def _subset(self, table: pd.DataFrame) -> Self:
-        """从指定索引表行构建子LoadData对象, 并保留对应已加载数据内容"""
         table = table.reset_index(drop=True)
         names = [""] * len(table) if self._isMerged else table["name"].tolist()
         payload = {
@@ -226,7 +175,6 @@ class LoadData:
     def _stack(
         entries: List[Tuple[str, pd.DataFrame]], mode: str
     ) -> pd.DataFrame | None:
-        """将同一工况链内的数据内容合并为单个DataFrame, 无有效条目时返回None"""
         if not entries:
             return None
         if mode == "hstack":
@@ -242,11 +190,9 @@ class LoadData:
 
     @classmethod
     def _empty(cls) -> Self:
-        """构建空LoadData对象, 用于无任何数据文件的场景"""
         return cls(pd.DataFrame(columns=LoadData._tableCols), {})
 
     def _rebased(self, chain: str) -> Self:
-        """构建工况链改写为指定值的LoadData对象, 用于Folder聚合时统一工况链"""
         table = self._table.copy()
         table["chain"] = chain
         payload = {(chain, name): df for (_, name), df in self._payload.items()}
@@ -254,7 +200,6 @@ class LoadData:
 
     @staticmethod
     def _concat(parts: List["LoadData"]) -> "LoadData":
-        """构建多个LoadData对象聚合后的LoadData对象, 用于Folder汇总加载结果"""
         if not parts:
             return LoadData._empty()
         table = pd.concat([part._table for part in parts], ignore_index=True)
@@ -267,30 +212,17 @@ class LoadData:
     # 外部用户方法
     def merge(self, mode: str = "hstack") -> Self:
         """
-        就地将同一工况链的数据文件合并为单个DataFrame, 并同步合并索引表
-
-        仅合并工况链相同的数据文件(即加载前归属同一个Files对象管理的数据文件), 不同工况链保持相互独立
-
-        合并后索引表去除 name 列, 单工况链即一行, 并逐行聚合数据文件的大小、时间、状态与元数据
+        将索引表中同一工况链的数据文件合并
 
         Parameters
         ----------
-        mode : str, default: 'hstack'
+        mode : str, default='hstack'
             合并模式, 'hstack'列并排合并并添加文件名前缀, 'vstack'行堆叠合并
 
         Returns
         -------
         Self
-            合并后的当前LoadData对象, 数据内容以 (工况链, '') 为键索引
-
-        Raises
-        ------
-        ValueError
-            传入不支持的合并模式时抛出
-
-        Notes
-        -----
-        重复调用是安全的, 已完成合并或无数据文件时跳过并记录警告日志
+            合并后的LoadData对象
         """
         if mode not in ("hstack", "vstack"):
             raise ValueError(f"{mode}: 不支持的合并模式, 仅支持: ['hstack', 'vstack']")
@@ -306,7 +238,7 @@ class LoadData:
         # 逐工况链合并数据文件
         rows: List[Dict[str, Any]] = []
         payload: Dict[Tuple[str, str], pd.DataFrame] = {}
-        for chain in self.chains:
+        for chain in self._table["chain"].unique().tolist():
             group: pd.DataFrame = self._table[self._table["chain"] == chain]
             entries: List[Tuple[str, pd.DataFrame]] = []
             metadata: Dict = {}
@@ -342,17 +274,10 @@ class LoadData:
         """
         按索引表行序将当前已加载数据内容转换为DataFrame列表
 
-        未合并时每个数据文件对应一个DataFrame, 合并后每个工况链对应一个DataFrame;
-        无数据内容的条目返回空DataFrame, 以保持列表顺序与索引表一致
-
         Returns
         -------
         List[pd.DataFrame]
-            按索引表顺序排列的数据内容列表
-
-        Examples
-        --------
-        >>> loaddata.to_Dataframe()
+            转换Dataframe列表, 按索引表顺序
         """
         return [df.copy() if df is not None else pd.DataFrame() for _, _, df in self]
 
@@ -372,7 +297,8 @@ class LoadData:
         Returns
         -------
         List[List[Signal]]
-            外层按索引表顺序对应文件, 内层按DataFrame列顺序对应Signal; 无数据条目的内层为空列表
+            转换Signal列表.
+            外层按索引表顺序对应文件, 内层按数据列顺序对应Signal
         """
         Listsig: List[List[Signal]] = []
         for c, n, df in self:
@@ -1078,7 +1004,7 @@ class Files:
         mat_read_params.update(kwargs)
         # 读取文件
         try:
-            mat = loadmat(filepath)
+            mat = loadmat(filepath, **mat_read_params)
         except Exception:
             logger.warning(f"读取失败: name={filepath.name}", exc_info=True)
             return pd.DataFrame(), "失败"
@@ -1329,14 +1255,17 @@ class Folder(anytree.Node):
         return LoadData._concat(parts)
 
     def matchfiles(
-        self, match: str, filter: Optional[str] = None, query: Optional[str] = None
+        self,
+        match: Optional[str] = "",
+        filter: Optional[str] = None,
+        query: Optional[str] = None,
     ) -> List[Files]:
         """
         筛选并返回该Folder挂载的符合匹配条件的Files对象
 
         Parameters
         ----------
-        match : str
+        match : str, default=""
             Folder级筛选参数，使用文件夹名关键词进行工况筛选，例如 'testA, case1'
         filter : str, optional
             Files级筛选参数，使用文件名正则模式进行数据文件筛选，例如 '.*_test.*'
@@ -1548,15 +1477,6 @@ class Dataset(Folder):
             目标文件类型, 支持: '.csv', '.txt', '.xlsx', '.mat'
         name : str, default: ''
             数据集名称
-
-        Raises
-        ------
-        ValueError
-            根目录路径不存在或不是文件夹, 或传入不支持的文件类型时抛出
-
-        Notes
-        -----
-        初始化即全目录扫描, 扫描失败或挂载失败的节点记录警告日志, 不中断整体构建
         """
         # 1. 基础信息处理
         self._rootpath = Path(root).resolve()
@@ -1640,27 +1560,10 @@ class Dataset(Folder):
     # --------------------------------------------------------------------------------#
     # 外部用户接口
     def refresh(self) -> Self:
-        """
-        刷新数据集结构, 重新扫描磁盘目录
-
-        磁盘目录结构变更(新增/删除工况文件夹或数据文件)后调用, 清空现有树结构并重建.
-        set_read_params 设置的全局读取参数不受影响
-
-        Returns
-        -------
-        Self
-            重新扫描后的当前Dataset对象
-        """
-        start_time = time()
-        logger.info(f"Dataset刷新开始: root={self._rootpath}")
-        # 清空现有子节点
-        self.children: list[Folder] = []
+        """刷新数据集结构, 重新扫描磁盘目录"""
+        # 清空现有子节点和挂载文件
+        self.children = []
+        self._files = None
         # 重新扫描
         self._scan_structure(self)
-        consumed_time = time() - start_time
-        node_count, file_count, size_total = self.stats.values()
-        logger.info(
-            f"Dataset刷新完成: nodes={node_count}, files={file_count}, "
-            f"size={size_total:.2f}MB, elapsed={consumed_time:.2f}s"
-        )
         return self
