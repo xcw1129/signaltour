@@ -161,7 +161,7 @@ def pad(sig: Signal, pad_width: int, mode: str = "constant") -> Signal:
     """
     extend_data = np.pad(sig._data, pad_width, mode=mode)  # ty:ignore[no-matching-overload]
     t_axis_extend = sig.t_axis.copy()
-    t_axis_extend.N = len(extend_data)
+    t_axis_extend._N = len(extend_data)
     t_axis_extend.t0 = sig.t_axis.t0 - pad_width * sig.t_axis.dt
     sig_extend = sig.template()
     sig_extend._axis = t_axis_extend

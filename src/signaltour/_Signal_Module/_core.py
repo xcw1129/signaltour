@@ -31,7 +31,7 @@ class Axis:
     """
     通用坐标轴类, 用于生成和管理一维顺序均匀采样坐标轴数据
 
-    Axis及其子类均通过维护核心参数(N, _dx, _x0)来动态生成坐标轴数据, 避免冗余存储和不同采样参数间的冲突
+    Axis及其子类均通过维护核心参数(_N, _dx, _x0)来动态生成坐标轴数据, 避免冗余存储和不同采样参数间的冲突
 
     Attributes
     ----------
@@ -56,11 +56,15 @@ class Axis:
     -------
     - copy()
         返回拷贝对象, 与原对象完全独立
+    - is_compatible(other)
+        判断两个坐标轴的采样间隔和单位是否兼容
     - to_pos_index(key)
         将物理索引转换为位置索引
     """
 
-    def __init__(self, N: int, dx: float, x0: float = 0.0, name: str = "", unit: str = "") -> None:
+    def __init__(
+        self, N: int, dx: float, x0: float = 0.0, name: str = "", unit: str = ""
+    ) -> None:
         """
         通用坐标轴类, 用于生成和管理一维顺序均匀采样坐标轴数据
 
@@ -82,7 +86,7 @@ class Axis:
             raise ValueError(f"N={N}: 坐标轴点数必须为正整数")
         if (not isinstance(dx, numbers.Real)) or dx <= 0:
             raise ValueError(f"dx={dx}: 坐标轴采样间隔必须为正数")
-        self.N: int = N
+        self._N: int = N
         self._dx: float = dx
         self._x0: float = x0
         self.name: str = name
@@ -91,24 +95,31 @@ class Axis:
     # --------------------------------------------------------------------------------#
     # 动态可读属性
     @property
+    def N(self) -> int:
+        """坐标轴点数"""
+        return self._N
+
+    @property
     def data(self) -> np.ndarray:
         """坐标轴数组"""
-        return self._x0 + np.arange(self.N) * self._dx  # x=[x0,x0+dx,x0+2dx,...,x0+(N-1)dx]
+        return (
+            self._x0 + np.arange(self._N) * self._dx
+        )  # x=[x0,x0+dx,x0+2dx,...,x0+(N-1)dx]
 
     @property
     def lim(self) -> tuple[float, float]:
         """坐标轴范围: (min, max)"""
-        return (self._x0, self._x0 + self._dx * self.N)  # (x0, x0+N*dx)
+        return (self._x0, self._x0 + self._dx * self._N)  # (x0, x0+N*dx)
 
     @property
     def L(self) -> float:
         """坐标轴分布长度"""
-        return self.N * self._dx  # N*dx
+        return self._N * self._dx  # N*dx
 
     # --------------------------------------------------------------------------------#
     # 数组特性支持
     def __len__(self):
-        return self.N
+        return self._N
 
     def __iter__(self):
         return iter(self.data)
@@ -118,7 +129,7 @@ class Axis:
         idx = (item - self._x0) / self._dx
         idx_round = round(idx)  # 取整数索引
         # 检查是否接近整数且在范围内
-        is_contained = abs(idx - idx_round) < 1e-5 and 0 <= idx_round < self.N
+        is_contained = abs(idx - idx_round) < 1e-5 and 0 <= idx_round < self._N
         return is_contained
 
     def __getitem__(self, index):
@@ -131,11 +142,11 @@ class Axis:
                 raise IndexError(f"index={index}: 不在坐标轴上, 无法索引到对应位置")
         # 处理顺序间隔索引以保持类型
         if isinstance(pos_idx, slice):
-            start, stop, step = pos_idx.indices(self.N)
+            start, stop, step = pos_idx.indices(self._N)
             if step > 0:
                 new_axis = self.copy()
                 # 调整核心参数
-                new_axis.N = len(range(start, stop, step))
+                new_axis._N = len(range(start, stop, step))
                 new_axis._dx = self._dx * step
                 new_axis._x0 = self._x0 + start * self._dx
                 return new_axis
@@ -151,7 +162,7 @@ class Axis:
     def __eq__(self, other) -> bool:
         if isinstance(other, Axis):
             return bool(
-                self.N == other.N
+                self._N == other._N
                 and np.isclose(self._dx, other._dx)
                 and np.isclose(self._x0, other._x0)
                 and self.unit == other.unit
@@ -166,9 +177,7 @@ class Axis:
 
     def __repr__(self):
         # 面向开发时
-        return (
-            f"{type(self).__name__}(N={self.N}, dx={self._dx}, x0={self._x0}, name='{self.name}', unit='{self.unit}')"  # noqa: E501
-        )
+        return f"{type(self).__name__}(N={self._N}, dx={self._dx}, x0={self._x0}, name='{self.name}', unit='{self.unit}')"  # noqa: E501
 
     # --------------------------------------------------------------------------------#
     # numpy兼容
@@ -180,6 +189,12 @@ class Axis:
     def copy(self):
         """返回拷贝对象, 与原对象完全独立"""
         return copy(self)  # 确保子类可直接继承使用
+
+    def is_compatible(self, other) -> bool:
+        """判断两个坐标轴的采样间隔和单位是否兼容"""
+        if not isinstance(other, Axis):
+            return False
+        return bool(np.isclose(self._dx, other._dx) and self.unit == other.unit)
 
     def to_pos_index(self, key):
         """将物理索引转换为位置索引, 单点索引为浮点数, 切片索引自动右对齐"""
@@ -196,7 +211,9 @@ class Axis:
             pattern = r"([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s*" + re.escape(unit)
             match = re.fullmatch(pattern, key)
             if not match:
-                raise IndexError(f"index={key}: 物理索引解析失败. 请使用'value unit'格式的物理索引")
+                raise IndexError(
+                    f"index={key}: 物理索引解析失败. 请使用'value unit'格式的物理索引"
+                )
             val = float(match.group(1))  # 提取数值部分并转换为浮点数
             # 转换为位置索引, 支持非对齐索引
             idx = (val - self._x0) / self._dx
@@ -268,7 +285,9 @@ class Series(NDArrayOperatorsMixin):
         self.label: str = label
         if data is not None:
             if self._check_data(data) is False:
-                raise ValueError(f"data={data}: 输入序列数据数组非法. 避免使用非一维数组, 长度不匹配或包含NaN值")
+                raise ValueError(
+                    f"data={data}: 输入序列数据数组非法. 避免使用非一维数组, 长度不匹配或包含NaN值"
+                )
             else:
                 self._data = np.asarray(data, copy=self._COPY_ARRAY)
         else:
@@ -283,11 +302,6 @@ class Series(NDArrayOperatorsMixin):
         """序列坐标轴"""
         return self._axis  # 支持内容修改
 
-    @axis.setter
-    def axis(self, value: Axis):
-        """序列坐标轴"""
-        self._axis = value  # 支持整体替换
-
     @property
     def data(self) -> np.ndarray:
         """序列数据数组"""
@@ -299,7 +313,9 @@ class Series(NDArrayOperatorsMixin):
     def data(self, value: np.ndarray):
         # 支持整体替换数据, 但需合法
         if self._check_data(value) is False:
-            raise ValueError(f"data={value}: 输入序列数据数组非法. 避免使用非一维数组, 长度不匹配或包含NaN值")
+            raise ValueError(
+                f"data={value}: 输入序列数据数组非法. 避免使用非一维数组, 长度不匹配或包含NaN值"
+            )
         self._data = np.asarray(value, copy=self._COPY_ARRAY)
 
     # --------------------------------------------------------------------------------#
@@ -327,7 +343,11 @@ class Series(NDArrayOperatorsMixin):
 
     def __eq__(self, other) -> bool:
         if isinstance(other, Series):
-            return self._axis == other._axis and np.allclose(self._data, other._data) and self.unit == other.unit
+            return (
+                self._axis == other._axis
+                and np.allclose(self._data, other._data)
+                and self.unit == other.unit
+            )
         return False  # 与非Series类型比较均返回False
 
     # --------------------------------------------------------------------------------#
@@ -364,33 +384,38 @@ class Series(NDArrayOperatorsMixin):
     def __array_function__(self, func, types, args, kwargs):
         # 将输入中的Series对象转为array以便函数处理
         args = [x._data if isinstance(x, Series) else x for x in args]
-        # 执行NumPy的函数操作
-        res = func(*args, **kwargs)
-        # 检查结果，保持返回类型一致
-        if isinstance(res, np.ndarray) and res.shape == self._data.shape and np.issubdtype(res.dtype, np.number):
-            new_srs = self.template(res)
-            return new_srs
-        else:
-            return res
+        return func(*args, **kwargs)
 
     # 底层运算函数兼容
     def __array_ufunc__(self, ufunc, method, *args, **kwargs):
+        for operand in args:
+            if isinstance(operand, Series) and not operand._axis.is_compatible(
+                self._axis
+            ):
+                raise ValueError(
+                    f"采样信息不兼容: self(dx={self._axis._dx}, unit='{self._axis.unit}'), "
+                    f"other(dx={operand._axis._dx}, unit='{operand._axis.unit}')"
+                )
         # ------------------------------------------------------------------------#
         # 支持out参数：就地运算中numpy会自动使用
         out = kwargs.get("out", None)
         if out is not None:
-            new_out = []
-            for o in out:
-                if isinstance(o, Series):
-                    new_out.append(o._data)  # 将out中的Series对象替换为其_data属性便于in-place修改
-                else:
-                    new_out.append(o)
+            for operand in out:
+                if isinstance(operand, Series) and not operand._axis.is_compatible(
+                    self._axis
+                ):
+                    raise ValueError(
+                        f"采样信息不兼容: self(dx={self._axis._dx}, unit='{self._axis.unit}'), "
+                        f"other(dx={operand._axis._dx}, unit='{operand._axis.unit}')"
+                    )
+            out_ = [o._data if isinstance(o, Series) else o for o in out]
             kwargs = dict(kwargs)
-            kwargs["out"] = tuple(new_out)
+            kwargs["out"] = tuple(out_)
         # ------------------------------------------------------------------------#
-        # 将输入中的Series对象转为array以便ufunc处理
+        # 将输入中的Series对象替换为其_data属性以便ufunc处理
         args_ = [x._data if isinstance(x, Series) else x for x in args]
         # 根据method调用相应的ufunc方法
+        # method=['__call__', 'reduce', 'accumulate', 'reduceat', 'outer', 'at']
         if method == "at":  # 处理就地操作(如add.at等，不支持)
             return NotImplemented
         if (
@@ -398,13 +423,19 @@ class Series(NDArrayOperatorsMixin):
         ):  # 处理非逐元素操作(如add.reduce等，极少使用)
             res = getattr(ufunc, method)(*args_, **kwargs)
             return res
-        elif method == "__call__" or method == "accumulate":  # 处理逐元素运算(如abs、multiply等，常用)
+        elif (
+            method == "__call__" or method == "accumulate"
+        ):  # 处理逐元素运算(如abs、multiply等，常用)
             res = getattr(ufunc, method)(*args_, **kwargs)
             # 如果指定了out参数, 则直接返回out
             if out is not None:
                 return out if len(out) > 1 else out[0]
             # 检查结果，保持返回类型一致
-            if isinstance(res, np.ndarray) and res.shape == self._data.shape and np.issubdtype(res.dtype, np.number):
+            if (
+                isinstance(res, np.ndarray)
+                and res.shape == self._data.shape
+                and np.issubdtype(res.dtype, np.number)
+            ):
                 new_srs = self.template(res)
                 return new_srs
             else:
@@ -521,7 +552,9 @@ class t_Axis(Axis):
             if T is not None:
                 N = int(T * fs)
             else:
-                raise ValueError(f"N={N}, fs={fs}, dt={dt}, T={T}: 采样参数输入错误. 输入fs参数时, 需同时输入N或T参数")
+                raise ValueError(
+                    f"N={N}, fs={fs}, dt={dt}, T={T}: 采样参数输入错误. 输入fs参数时, 需同时输入N或T参数"
+                )
         super().__init__(N=N, dx=1.0 / fs, x0=t0, unit="s", name="时间")
 
     # --------------------------------------------------------------------------------#
@@ -559,15 +592,8 @@ class t_Axis(Axis):
 
     @property
     def T(self) -> float:
-        """采样时长[s], 修改同步至 N"""
-        return self.N * self.dt
-
-    @T.setter
-    def T(self, value: float):
-        if value <= 0:
-            raise ValueError(f"T={value}: 采样时长必须大于0")
-        # 固定 dt，调整 N
-        self.N = max(1, int(np.ceil(value / self.dt - 1e-5)))
+        """采样时长[s]"""
+        return self._N * self.dt
 
     # ----------------------------------------------------------------------------#
     # 外部用户方法
@@ -585,7 +611,7 @@ class t_Axis(Axis):
         f_Axis
             频率坐标轴
         """
-        return f_Axis(N=self.N, F=self.fs, f0=f0)
+        return f_Axis(N=self._N, F=self.fs, f0=f0)
 
 
 class f_Axis(Axis):
@@ -615,7 +641,13 @@ class f_Axis(Axis):
         将物理索引转换为位置索引
     """
 
-    def __init__(self, N: Optional[int] = None, df: Optional[float] = None, F: Optional[float] = None, f0: float = 0.0):
+    def __init__(
+        self,
+        N: Optional[int] = None,
+        df: Optional[float] = None,
+        F: Optional[float] = None,
+        f0: float = 0.0,
+    ):
         """
         频率坐标轴类
 
@@ -631,17 +663,23 @@ class f_Axis(Axis):
             频率起始点[Hz]
         """
         if not [N, df, F].count(None) == 1:
-            raise ValueError(f"N={N}, df={df}, F={F}: 频率参数输入错误. 请确保输入两个参数")
+            raise ValueError(
+                f"N={N}, df={df}, F={F}: 频率参数输入错误. 请确保输入两个参数"
+            )
         if df is None:
             if F is not None and N is not None:
                 df = F / N
             else:
-                raise ValueError(f"N={N}, df={df}, F={F}: 频率参数输入错误. 请输入df参数, 或同时输入N与F参数")
+                raise ValueError(
+                    f"N={N}, df={df}, F={F}: 频率参数输入错误. 请输入df参数, 或同时输入N与F参数"
+                )
         if N is None:
             if F is not None:
                 N = int(F / df)
             else:
-                raise ValueError(f"N={N}, df={df}, F={F}: 频率参数输入错误. 输入df参数时, 需同时输入N或F参数")
+                raise ValueError(
+                    f"N={N}, df={df}, F={F}: 频率参数输入错误. 输入df参数时, 需同时输入N或F参数"
+                )
         super().__init__(N=N, dx=df, x0=f0, unit="Hz", name="频率")
 
     # --------------------------------------------------------------------------------#
@@ -668,15 +706,8 @@ class f_Axis(Axis):
 
     @property
     def F(self) -> float:
-        """频率分布宽度[Hz], 修改同步至 N"""
-        return self.N * self._dx  # 频率分布宽度
-
-    @F.setter
-    def F(self, value: float):
-        if value <= 0:
-            raise ValueError(f"F={value}: 频率分布宽度必须大于0")
-        # 固定 df，调整 N
-        self.N = max(1, int(np.ceil(value / self._dx - 1e-5)))
+        """频率分布宽度[Hz]"""
+        return self._N * self._dx  # 频率分布宽度
 
 
 # --------------------------------------------------------------------------------------------#
@@ -756,18 +787,15 @@ class Signal(SignalFilter, SignalSample, Series):
         """时间坐标轴"""
         return self._axis
 
-    @t_axis.setter
-    def t_axis(self, value: t_Axis):
-        """时间坐标轴"""
-        self._axis: t_Axis = value
-
     # --------------------------------------------------------------------------------#
     # 外部用户方法
     def to_Spectra(self) -> "Spectra":
         """转换信号到其频谱"""
         from .._Analysis_Module._SpectrumAnalysis import SpectrumAnalysis
 
-        spc = SpectrumAnalysis(self).cft(winType="矩形窗", padTimes=0)  # 保持原始长度, 不延拓
+        spc = SpectrumAnalysis(self).cft(
+            winType="矩形窗", padTimes=0
+        )  # 保持原始长度, 不延拓
         return spc
 
 
@@ -835,17 +863,14 @@ class Spectra(Series):
         """频率坐标轴"""
         return self._axis
 
-    @f_axis.setter
-    def f_axis(self, value: f_Axis):
-        """频率坐标轴"""
-        self._axis: f_Axis = value
-
     # --------------------------------------------------------------------------------#
     # 外部用户方法
     def halfCut(self) -> Self:
         """裁剪为单边谱"""
         if self.f_axis.f0 != 0.0:
-            raise ValueError(f"f0={self.f_axis.f0}: 当前谱频率轴不完整, 无法进行单边谱裁剪")
+            raise ValueError(
+                f"f0={self.f_axis.f0}: 当前谱频率轴不完整, 无法进行单边谱裁剪"
+            )
         N = len(self)
         if N % 2 == 0:
             half_N = N // 2 + 1  # 包含fn频率点, 但幅值一般为0

@@ -300,19 +300,13 @@ class SpectrumAnalysis(BaseAnalysis):
         计算序列数据的逆离散傅里叶变换
 
     - ft(symmetric: bool = False) -> Spectra
-        计算能量信号在0~N/2*Δf范围内傅里叶变换的离散近似
+        计算信号傅里叶变换的离散近似
 
     - cft(winType: str = "汉宁窗", padTimes: int = 3) -> Spectra
-        计算功率信号在0~N/2*Δf范围内傅里叶级数系数的离散近似
+        计算周期信号的傅里叶级数幅值谱
 
     - psd(averageTimes: int = 10, type: str = "功率") -> Spectra
-        估计带噪声功率信号在0~N/2*Δf范围内的功率分布
-
-    - psdDiff(Sig_ref: Signal, averageTimes: int = 10, mode: str = "absolute") -> Spectra
-        计算与参考信号的差分功率谱
-
-    - enveSpectra() -> Spectra
-        计算希尔伯特包络幅值谱
+        估计平稳随机信号的功率谱
     """
 
     @staticmethod

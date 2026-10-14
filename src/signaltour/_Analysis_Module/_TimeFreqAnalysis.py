@@ -381,9 +381,9 @@ class CWTAnalysis(BaseAnalysis):
             if Sig_wavelet.data.dtype == complex:
                 plot.waveform(
                     [
-                        np.real(Sig_wavelet).set_label("实部"),
-                        np.imag(Sig_wavelet).set_label("虚部"),
-                        np.abs(Sig_wavelet).set_label("包络"),
+                        Sig_wavelet.template(np.real(Sig_wavelet.data)).set_label("实部"),
+                        Sig_wavelet.template(np.imag(Sig_wavelet.data)).set_label("虚部"),
+                        Sig_wavelet.template(np.abs(Sig_wavelet.data)).set_label("包络"),
                     ],
                     title="时域波形",
                 )
