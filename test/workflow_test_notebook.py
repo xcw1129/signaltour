@@ -1,22 +1,6 @@
-# /// script
-# dependencies = [
-#     "anytree==2.13.0",
-#     "marimo>=0.23.3",
-#     "matplotlib==3.11.2",
-#     "numpy==2.5.3",
-#     "pandas==3.0.5",
-#     "pyarrow==25.0.1",
-#     "python-lsp-ruff==2.3.4",
-#     "python-lsp-server==1.15.0",
-#     "scipy==1.18.1",
-#     "websockets==17.1",
-# ]
-# requires-python = ">=3.14"
-# ///
-
 import marimo
 
-__generated_with = "0.25.0"
+__generated_with = "0.24.2"
 app = marimo.App(width="medium")
 
 with app.setup:
@@ -25,21 +9,11 @@ with app.setup:
     import matplotlib.pyplot as plt
 
     import warnings
-
     warnings.filterwarnings(
         "ignore",
         message="FigureCanvasAgg is non-interactive",
         category=UserWarning,
     )
-    import logging, sys
-
-    logger = logging.getLogger("signaltour")
-    logger.setLevel(logging.WARNING)
-    logger.propagate = False
-    logger.handlers.clear()
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: \n\t%(message)s"))
-    logger.addHandler(handler)
 
     import signaltour as st
 
@@ -90,18 +64,15 @@ def _():
 @app.cell
 def _(dataset_mat):
     datafolder_mat = dataset_mat["12k Drive End Bearing Fault Data"]
-    data_mat = datafolder_mat.loadMatch(match="0021", filter="_0")
-    data_mat.table
+    data_mat = datafolder_mat.loadMatch(match="Outer, 0021", filter="_0")
+    data_mat()
     return (data_mat,)
 
 
 @app.cell
 def _(data_mat):
-    _Listfig = []
-    for _sig in data_mat.to_Signal(fs=12000, name="加速度", unit="$m/s^2$"):
-        _sig.plot()
-        _Listfig.append(plt.gcf())
-    mo.vstack(_Listfig, align="center")
+    _df_mat_list = data_mat.to_Dataframe()
+    _df_mat_list
     return
 
 
@@ -118,6 +89,7 @@ def _():
     dataset_csv = st.Dataset(
         root=r"F:\OneDrive\Database\学术公开数据集\寿命预测\XJTU_轴承加速退化振动数据集\Data",
         type=".csv",
+        name="XJTU轴承加速退化振动数据集",
     )
     dataset_csv.info()
     return (dataset_csv,)
@@ -126,24 +98,19 @@ def _():
 @app.cell
 def _(dataset_csv):
     datafolder_csv = dataset_csv["35Hz12kN"]
-    datafolder_csv.stats
-    return (datafolder_csv,)
-
-
-@app.cell
-def _(datafolder_csv):
-    data_csv = datafolder_csv.loadAll(isParallel=True, parallelNum=10, usePyarrow=True).merge("vstack")
-    data_csv.table
+    data_csv = datafolder_csv.loadAll(
+        isParallel=True, parallelNum=10, usePyarrow=True
+    ).merge("vstack")
+    data_csv()
     return (data_csv,)
 
 
 @app.cell
 def _(data_csv):
-    _Listfig = []
-    for _sig in data_csv.to_Signal(fs=35000, name="加速度", unit="$m/s^2$"):
+    _sig_csv_list = data_csv.to_Signal(fs=35000, name="加速度", unit="g")[0]
+    for _sig in _sig_csv_list:
         _sig.plot()
-        _Listfig.append(plt.gcf())
-    mo.vstack(_Listfig, align="center")
+        mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return
 
 
@@ -169,8 +136,7 @@ def _():
         noise=5,
     )
     _sig.plot()
-    _fig = plt.gcf()
-    mo.vstack([_fig], align="center")
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return
 
 
@@ -189,8 +155,7 @@ def _():
         noiseParams=(20, 10),
     )
     _sig.plot()
-    _fig = plt.gcf()
-    mo.vstack([_fig], align="center")
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return
 
 
@@ -204,12 +169,11 @@ def _():
         FM=lambda t: 50 * t,
     )
     _sig.plot()
-    _fig = plt.gcf()
-    mo.vstack([_fig], align="center")
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return
 
 
-@app.cell(expand_output=True)
+@app.cell
 def _():
     sig = st.Signal(axis=st.t_Axis(fs=10000, T=1), label="仿真信号")
     sig += st.periodic(
@@ -242,7 +206,8 @@ def _():
         AM=lambda t: 2 + (5 * t) ** 2,
         FM=lambda t: 50 * t,
     )
-    mo.vstack([sig.plot()[0],sig.to_Spectra().plot(xlim=(0,1000))[0]], align="center")
+    sig.plot()
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return (sig,)
 
 
@@ -265,24 +230,30 @@ def _():
 @app.cell
 def _(sig):
     _sig = sig.resample(type="extreme", dt=0.001)
-    mo.vstack([_sig.plot(ylim=(-50,50))[0]], align="center")
+    _sig.plot()
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
+    sig.plot()
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return
 
 
 @app.cell
 def _(sig):
     _sig = sig.pad(pad_width=1000, mode="reflect")
-    mo.vstack([_sig.plot(ylim=(-50,50))[0]], align="center")
+    _sig.plot()
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
+    sig.plot()
+    plt.xlim(-0.1,1.1)
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return
 
 
 @app.cell
 def _(sig):
-    _Listsig = sig.segment(nseg=15, overlap=0.5)
-    _Listfig = []
-    for _sig in _Listsig:
-        _Listfig.append(_sig.plot()[0])
-    mo.vstack(_Listfig, align="center")
+    _sig_seg_list = sig.segment(nseg=15, overlap=0.5)
+    for _sig in _sig_seg_list:
+        _sig.plot()
+        mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return
 
 
@@ -296,22 +267,35 @@ def _():
 
 @app.cell
 def _(sig):
-    _sig = sig.filtFIR(cutoff=(2000,3000),order=256, btype="bandpass", zero_phase=True)
-    mo.vstack([_sig.plot()[0]], align="center")
+    _sig = sig.filtFIR(
+        cutoff=(2000, 3000), order=256, btype="bandpass", zero_phase=True
+    )
+    _sig.plot()
+    plt.ylim(-20, 20)
+    plt.yticks([-15, -10, -5, 0, 5, 10, 15])
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return
 
 
 @app.cell
 def _(sig):
-    _sig = sig.filtIIR(cutoff=(2000,3000),btype='bandpass',ftype='butter')
-    mo.vstack([_sig.plot()[0]], align="center")
+    _sig = sig.filtIIR(cutoff=(2000, 3000), btype="bandpass", ftype="butter")
+    _sig.plot()
+    plt.ylim(-20, 20)
+    plt.yticks([-15, -10, -5, 0, 5, 10, 15])
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return
 
 
 @app.cell
 def _(sig):
     _sig = sig.filtMedian(size=11)
-    mo.vstack([_sig.plot(ylim=(-50,50))[0]], align="center")
+    _sig.plot()
+    plt.ylim(-50,50)
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
+    sig.plot()
+    plt.ylim(-50,50)
+    mo.output.append(mo.vstack([plt.gcf()], align="center"))
     return
 
 
