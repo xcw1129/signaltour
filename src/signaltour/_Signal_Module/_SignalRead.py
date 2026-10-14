@@ -18,7 +18,18 @@ from concurrent.futures import ThreadPoolExecutor
 from importlib import util
 from pathlib import Path
 from time import time
-from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Self, Tuple, TypeAlias
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Literal,
+    Optional,
+    Self,
+    Tuple,
+    TypeAlias,
+)
 
 import anytree
 import numpy as np
@@ -29,7 +40,9 @@ from ._core import Signal, t_Axis
 
 # 初始化日志记录器
 logger = logging.getLogger(__name__)
-ReadStatus: TypeAlias = Literal["完成", "跳过", "失败"]  # 读取状态: 完成=有效数据, 跳过=数据为空, 失败=读取异常
+ReadStatus: TypeAlias = Literal[
+    "完成", "跳过", "失败"
+]  # 读取状态: 完成=有效数据, 跳过=数据为空, 失败=读取异常
 
 
 # --------------------------------------------------------------------------------------------#
@@ -56,15 +69,36 @@ class LoadData:
     -------
     - merge(mode='hstack') -> Self
         就地将同一工况链的数据文件合并为单个 DataFrame
-    - to_Signal(fs, name) -> List[Signal]
-        将所有加载数据(每列)转换为 Signal 对象, label 按 '{工况链}#{文件名}#{列名}' 格式生成
+    - to_Dataframe() -> List[pd.DataFrame]
+        按索引表行序将每个文件/工况链的数据内容转换为 DataFrame 列表
+    - to_Signal(fs, name, unit) -> List[List[Signal]]
+        按文件、按列两层列表转换 Signal 对象, label 按 '{工况链}#{文件名}#{列名}' 格式生成
     """
 
-    _tableCols: List[str] = ["chain", "name", "size[MB]", "modifiedTime", "status", "attrs"]
-    _mergedCols: List[str] = ["chain", "size[MB]", "modifiedTime", "status", "attrs"]  # 合并后的索引表列
-    _statusRank: Dict[str, int] = {"完成": 0, "跳过": 1, "失败": 2}  # 状态严重程度, 合并时取最严重者
+    _tableCols: List[str] = [
+        "chain",
+        "name",
+        "size[MB]",
+        "modifiedTime",
+        "status",
+        "attrs",
+    ]
+    _mergedCols: List[str] = [
+        "chain",
+        "size[MB]",
+        "modifiedTime",
+        "status",
+        "attrs",
+    ]  # 合并后的索引表列
+    _statusRank: Dict[str, int] = {
+        "完成": 0,
+        "跳过": 1,
+        "失败": 2,
+    }  # 状态严重程度, 合并时取最严重者
 
-    def __init__(self, table: pd.DataFrame, payload: Dict[Tuple[str, str], pd.DataFrame]) -> None:
+    def __init__(
+        self, table: pd.DataFrame, payload: Dict[Tuple[str, str], pd.DataFrame]
+    ) -> None:
         """
         数据加载结果类, 面向后续数据分析统一承载数据文件索引与数据内容
 
@@ -100,65 +134,72 @@ class LoadData:
 
     def __iter__(self) -> Iterator[Tuple[str, str, Optional[pd.DataFrame]]]:
         """迭代器, 按索引表顺序遍历(工况链, 文件名, 数据内容), 合并后文件名恒为空串, 无数据条目为None"""
-        names = [""] * len(self._table) if self._isMerged else self._table["name"].tolist()
+        names = (
+            [""] * len(self._table) if self._isMerged else self._table["name"].tolist()
+        )
         for chain, name in zip(self._table["chain"], names):
             yield chain, name, self._payload.get((chain, name))
 
-    def __getitem__(self, item) -> pd.DataFrame | Self:
+    def __getitem__(self, item: int | slice | str | Tuple[str, str]) -> Self:
         """
-        支持二元组与字符串索引
+        支持整数、切片、字符串与二元组索引, 均返回子LoadData对象
 
-        二元组 (工况链, 文件名) 返回单个数据内容, 其中合并后文件名恒为空串
-
-        字符串视为索引表的 pandas query 表达式, 筛选后返回子LoadData对象, 无匹配时返回空对象
+        整数与切片基于索引表行序索引; 字符串视为索引表的 pandas query 表达式;
+        二元组 (工况链, 文件名) 精确匹配单条已加载数据, 其中合并后文件名恒为空串
 
         Parameters
         ----------
-        item : Tuple[str, str] | str
-            二元组 (工况链, 文件名) 或索引表的 pandas query 表达式字符串
+        item : int | slice | str | Tuple[str, str]
+            整数与切片按索引表行序, 字符串为 pandas query 表达式, 二元组为 (工况链, 文件名)
 
         Returns
         -------
-        pd.DataFrame | Self
-            二元组索引返回单个数据内容, 字符串索引返回筛选后的子LoadData对象
+        Self
+            筛选后的子LoadData对象; 无匹配数据时返回空对象
 
         Raises
         ------
         KeyError
-            二元组未找到对应数据内容, 或索引类型不受支持
+            二元组未找到对应已加载数据, 或索引类型不受支持
         ValueError
             query 表达式无效
+        IndexError
+            整数索引越界
 
         Examples
         --------
+        >>> loaddata[0]
+        >>> loaddata[0:2]
         >>> loaddata["chain == 'testA/case1'"]
         >>> loaddata["status == '失败'"]
         >>> loaddata["`size[MB]` > 1.0"]
         >>> loaddata[('testA/case1', 'data1.csv')]  # 未合并时按文件名取数据
         >>> loaddata[('testA/case1', '')]           # 合并后文件名恒为空串
         """
-        # 1. 二元组索引 (工况链, 文件名)
-        if isinstance(item, tuple) and len(item) == 2:
-            if item in self._payload:
-                return self._payload[item]
-            else:
-                raise KeyError(f"key={item}: 未找到对应的数据内容, 可检查table中的读取状态")
+        # 1. 整数与切片索引 (基于索引表行序)
+        if isinstance(item, (int, slice)):
+            table = self._table.iloc[item] if isinstance(item, slice) else self._table.iloc[[item]]
+            return self._subset(table)
         # ------------------------------------------------------------------------#
-        # 2. 字符串索引 (索引表query表达式)
+        # 2. 二元组索引 (工况链, 文件名)
+        elif isinstance(item, tuple) and len(item) == 2 and all(isinstance(value, str) for value in item):
+            chain, name = item
+            if item not in self._payload:
+                raise KeyError(f"key={item}: 未找到对应的数据内容, 可检查table中的读取状态")
+            mask = self._table["chain"] == chain
+            if not self._isMerged:
+                mask &= self._table["name"] == name
+            return self._subset(self._table[mask])
+        # ------------------------------------------------------------------------#
+        # 3. 字符串索引 (索引表query表达式)
         elif isinstance(item, str):
             try:
                 table: pd.DataFrame = self._table.query(item)
             except Exception as error:
                 raise ValueError(f"query={item}: 索引表达式无效, {error}") from error
-            names = [""] * len(table) if self._isMerged else table["name"].tolist()
-            payload = {
-                (chain, name): self._payload[(chain, name)]
-                for chain, name in zip(table["chain"], names)
-                if (chain, name) in self._payload
-            }
-            return type(self)(table.reset_index(drop=True), payload)
+            return self._subset(table)
         else:
-            raise KeyError("LoadData 索引仅支持字符串(query表达式)和二元组(工况链, 文件名)")
+            raise KeyError("LoadData 索引仅支持整数、切片、字符串(query表达式)和二元组(工况链, 文件名)")
 
     def __repr__(self) -> str:
         return f"LoadData(chains={len(self.chains)}, rows={len(self)}, loaded={len(self._payload)})"
@@ -170,15 +211,29 @@ class LoadData:
         """索引表是否已完成合并, 已合并的索引表不含 name 列"""
         return "name" not in self._table.columns
 
+    def _subset(self, table: pd.DataFrame) -> Self:
+        """从指定索引表行构建子LoadData对象, 并保留对应已加载数据内容"""
+        table = table.reset_index(drop=True)
+        names = [""] * len(table) if self._isMerged else table["name"].tolist()
+        payload = {
+            (chain, name): self._payload[(chain, name)]
+            for chain, name in zip(table["chain"], names)
+            if (chain, name) in self._payload
+        }
+        return type(self)(table, payload)
+
     @staticmethod
-    def _stack(entries: List[Tuple[str, pd.DataFrame]], mode: str) -> pd.DataFrame | None:
+    def _stack(
+        entries: List[Tuple[str, pd.DataFrame]], mode: str
+    ) -> pd.DataFrame | None:
         """将同一工况链内的数据内容合并为单个DataFrame, 无有效条目时返回None"""
         if not entries:
             return None
         if mode == "hstack":
             # 为避免列名冲突, 添加文件名前缀
             Listdataframe: List[pd.DataFrame] = [
-                df.set_axis([f"{Path(name).stem}#{col}" for col in df.columns], axis=1) for name, df in entries
+                df.set_axis([f"{Path(name).stem}#{col}" for col in df.columns], axis=1)
+                for name, df in entries
             ]
             filesdata = pd.concat(Listdataframe, axis=1)
         else:
@@ -267,7 +322,9 @@ class LoadData:
                     "chain": chain,
                     "size[MB]": float(group["size[MB]"].sum()),
                     "modifiedTime": group["modifiedTime"].max(),
-                    "status": max(group["status"], key=lambda status: LoadData._statusRank[status]),
+                    "status": max(
+                        group["status"], key=lambda status: LoadData._statusRank[status]
+                    ),
                     "attrs": metadata,
                 }
             )
@@ -276,10 +333,30 @@ class LoadData:
         self._table = pd.DataFrame(rows, columns=LoadData._mergedCols)
         self._payload = payload
         consumed_time = time() - start_time
-        logger.info(f"合并完成: mode={mode}, chains={len(rows)}, files={source_count}, elapsed={consumed_time:.2f}s")
+        logger.info(
+            f"合并完成: mode={mode}, chains={len(rows)}, files={source_count}, elapsed={consumed_time:.2f}s"
+        )
         return self
 
-    def to_Signal(self, fs: float, name: str, unit: str) -> List[Dict[str, "Signal"]]:
+    def to_Dataframe(self) -> List[pd.DataFrame]:
+        """
+        按索引表行序将当前已加载数据内容转换为DataFrame列表
+
+        未合并时每个数据文件对应一个DataFrame, 合并后每个工况链对应一个DataFrame;
+        无数据内容的条目返回空DataFrame, 以保持列表顺序与索引表一致
+
+        Returns
+        -------
+        List[pd.DataFrame]
+            按索引表顺序排列的数据内容列表
+
+        Examples
+        --------
+        >>> loaddata.to_Dataframe()
+        """
+        return [df.copy() if df is not None else pd.DataFrame() for _, _, df in self]
+
+    def to_Signal(self, fs: float, name: str, unit: str) -> List[List[Signal]]:
         """
         将所有加载数据(每文件/每列)转换为Signal
 
@@ -294,22 +371,28 @@ class LoadData:
 
         Returns
         -------
-        List[Dict[str, Signal]]
-            转换的Signal. 每文件为一个字典, 字典键为列名, 值为对应的Signal对象. 字典列表按索引表顺序排列
+        List[List[Signal]]
+            外层按索引表顺序对应文件, 内层按DataFrame列顺序对应Signal; 无数据条目的内层为空列表
         """
-        Listdf = []
+        Listsig: List[List[Signal]] = []
         for c, n, df in self:
-            Dictsig: Dict[str, Signal] = {}
+            filesig: List[Signal] = []
             c = c + "#" if c != "." else ""
             n = n + "#" if n != "" else ""
             if df is not None and not df.empty:
                 for col in df.columns:
                     data = np.asarray(df[col].dropna(), copy=True)
                     label = c + n + col
-                    sig = Signal(axis=t_Axis(fs=fs, N=len(data)), data=data, name=name, unit=unit, label=label)
-                    Dictsig[col] = sig
-            Listdf.append(Dictsig)
-        return Listdf
+                    sig = Signal(
+                        axis=t_Axis(fs=fs, N=len(data)),
+                        data=data,
+                        name=name,
+                        unit=unit,
+                        label=label,
+                    )
+                    filesig.append(sig)
+            Listsig.append(filesig)
+        return Listsig
 
 
 class Files:
@@ -350,7 +433,11 @@ class Files:
     """
 
     def __init__(
-        self, root: str, type: str, names: Optional[List[str]] = None, records: Optional[List[Dict[str, Any]]] = None
+        self,
+        root: str,
+        type: str,
+        names: Optional[List[str]] = None,
+        records: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         """
         数据文件批量管理类, 支持单一目录下指定类型数据文件的快速筛选与批量加载
@@ -384,7 +471,9 @@ class Files:
         rejected = 0
         if not is_internal:
             mode = "scan" if names is None else "names"
-            logger.info(f"Files初始化开始: root={rootpath}, type={filetype}, mode={mode}")
+            logger.info(
+                f"Files初始化开始: root={rootpath}, type={filetype}, mode={mode}"
+            )
             if not rootpath.exists() or not rootpath.is_dir():
                 raise ValueError(f"输入的目录路径不存在或不是文件夹: {rootpath}")
             # ----------------------------------------------------------------#
@@ -392,7 +481,9 @@ class Files:
             if names is None:
                 # 若未传入 names 则扫描所有符合类型的文件
                 valid_names: List[str] = [
-                    f.name for f in rootpath.iterdir() if f.is_file() and f.suffix.lower() == filetype
+                    f.name
+                    for f in rootpath.iterdir()
+                    if f.is_file() and f.suffix.lower() == filetype
                 ]
             else:
                 # 若传入 names 则仅验证这些文件的有效性
@@ -410,7 +501,9 @@ class Files:
                         else:
                             reason = "类型不匹配"
                         rejected += 1
-                        logger.warning(f"Files初始化跳过: root={rootpath}, name={name}, reason={reason}")
+                        logger.warning(
+                            f"Files初始化跳过: root={rootpath}, name={name}, reason={reason}"
+                        )
             # ----------------------------------------------------------------#
             # 对目标数据文件进行元数据收集
             records = []
@@ -433,13 +526,19 @@ class Files:
         if self._fileTable.empty:  # 传入或扫描的数据文件注册表为空
             self._fileTable = pd.DataFrame(columns=Files._fileTableCols)
         # 处理表格数据并记录元数据属性
-        self._fileTable["size[MB]"] = self._fileTable["size[MB]"] / (1024 * 1024)  # 转换为MB单位
-        self._fileTable["modifiedTime"] = pd.to_datetime(self._fileTable["modifiedTime"], unit="s").dt.round("s")
+        self._fileTable["size[MB]"] = self._fileTable["size[MB]"] / (
+            1024 * 1024
+        )  # 转换为MB单位
+        self._fileTable["modifiedTime"] = pd.to_datetime(
+            self._fileTable["modifiedTime"], unit="s"
+        ).dt.round("s")
         self._fileTable.attrs["rootpath"] = rootpath
         self._fileTable.attrs["filetype"] = filetype
         # 进行最终注册表验证
         if self._fileTable.columns.tolist() != Files._fileTableCols:
-            logger.warning(f"Files初始化失败: root={rootpath}, reason=文件注册表列校验未通过")
+            logger.warning(
+                f"Files初始化失败: root={rootpath}, reason=文件注册表列校验未通过"
+            )
             self._fileTable = pd.DataFrame(columns=Files._fileTableCols)
         # ------------------------------------------------------------------------#
         # 输出构造结果 (Dataset 内部扫描路径仅在空结果时提示)
@@ -534,7 +633,9 @@ class Files:
         if isinstance(item, (int, slice)):
             # 统一转为列表或切片直接索引
             return self._new_from_records(
-                self._fileTable.iloc[item] if isinstance(item, slice) else self._fileTable.iloc[[item]]
+                self._fileTable.iloc[item]
+                if isinstance(item, slice)
+                else self._fileTable.iloc[[item]]
             )
         # ------------------------------------------------------------------------#
         # 2. 字符串与字符串列表索引
@@ -574,7 +675,9 @@ class Files:
         >>> files.filter('case\d+')
         >>> files.filter('^data_')
         """
-        mask = self._fileTable["name"].str.contains(pattern, case=False, regex=True, na=False)
+        mask = self._fileTable["name"].str.contains(
+            pattern, case=False, regex=True, na=False
+        )
         return self._new_from_records(self._fileTable[mask])
 
     def query(self, expr: str) -> Self:
@@ -606,7 +709,9 @@ class Files:
         """
         return self._new_from_records(self._fileTable.query(expr))
 
-    def sorted(self, by: str = "name", ascending: bool = True, natural: bool = True) -> Self:
+    def sorted(
+        self, by: str = "name", ascending: bool = True, natural: bool = True
+    ) -> Self:
         """
         对数据文件进行排序, 方便后续按序加载
 
@@ -631,14 +736,18 @@ class Files:
         """
 
         def natural_sort_key(s):
-            return tuple(int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s))
+            return tuple(
+                int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s)
+            )
 
         if self._fileTable.empty:
             return self
         df: pd.DataFrame = self._fileTable.copy()
         if by == "name" and natural:
             df["_sort_key"] = df["name"].apply(natural_sort_key)
-            df = df.sort_values(by="_sort_key", ascending=ascending).drop(columns=["_sort_key"])
+            df = df.sort_values(by="_sort_key", ascending=ascending).drop(
+                columns=["_sort_key"]
+            )
         else:
             df = df.sort_values(by=by, ascending=ascending)
         # 就地更新文件表
@@ -682,7 +791,9 @@ class Files:
         start_time = time()
         logger.info(f"Files加载开始: root={self.rootpath}, count={len(self)}")
         if len(self) == 0:
-            logger.warning(f"Files加载中止: root={self.rootpath}, reason=无待读取的数据文件")
+            logger.warning(
+                f"Files加载中止: root={self.rootpath}, reason=无待读取的数据文件"
+            )
             return LoadData._empty()
         if usePyarrow:
             if util.find_spec("pyarrow") is not None:
@@ -697,7 +808,10 @@ class Files:
         # ------------------------------------------------------------------------#
         # 批量读取文件
         Listread: List[Tuple[pd.DataFrame, ReadStatus]] = Files._read_batch(
-            self.filepaths, lambda fp: Files._read_funcs[self.filetype](fp, **kwargs), isParallel, parallelNum
+            self.filepaths,
+            lambda fp: Files._read_funcs[self.filetype](fp, **kwargs),
+            isParallel,
+            parallelNum,
         )
         # ------------------------------------------------------------------------#
         # 构建索引表与数据内容
@@ -707,7 +821,9 @@ class Files:
         table["status"] = [status for _, status in Listread]
         table["attrs"] = [dict(df.attrs) for df, _ in Listread]
         payload: Dict[Tuple[str, str], pd.DataFrame] = {
-            (chain, name): df for name, (df, status) in zip(self.filenames, Listread) if status == "完成"
+            (chain, name): df
+            for name, (df, status) in zip(self.filenames, Listread)
+            if status == "完成"
         }
         consumed_time = time() - start_time
         done_count = len(payload)
@@ -772,7 +888,9 @@ class Files:
             logger.warning(f"Files预览中止: root={self.rootpath}, reason=无可预览文件")
             return None
         sample_size = min(num, len(self))
-        logger.info(f"Files预览开始: root={self.rootpath}, count={len(self)}, num={sample_size}")
+        logger.info(
+            f"Files预览开始: root={self.rootpath}, count={len(self)}, num={sample_size}"
+        )
         preview_params: Dict = Files._read_params[self.filetype].copy()
         preview_params.update(kwargs)
         logger.info(f"读取开始: type={self.filetype}, params={preview_params}")
@@ -783,7 +901,9 @@ class Files:
             Listdataframe.append(df)
         consumed_time = time() - start_time
         done_count = sum(1 for df in Listdataframe if not df.empty)
-        logger.info(f"Files预览完成: root={self.rootpath}, done={done_count}, elapsed={consumed_time:.2f}s")
+        logger.info(
+            f"Files预览完成: root={self.rootpath}, done={done_count}, elapsed={consumed_time:.2f}s"
+        )
         return Listdataframe
 
     # --------------------------------------------------------------------------------#
@@ -850,7 +970,9 @@ class Files:
         """
         legal = Files._check_filetype(filetype)
         Files._read_params[legal].update(kwargs)
-        logger.info(f"读取参数更新: type={legal}, action=set, params={Files._read_params[legal]}")
+        logger.info(
+            f"读取参数更新: type={legal}, action=set, params={Files._read_params[legal]}"
+        )
 
     @staticmethod
     def clean_read_params(filetype: str) -> None:
@@ -887,7 +1009,9 @@ class Files:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 read_list = list(executor.map(read_once_func, filepaths))
         else:
-            read_list: List[Tuple[pd.DataFrame, ReadStatus]] = [read_once_func(fp) for fp in filepaths]
+            read_list: List[Tuple[pd.DataFrame, ReadStatus]] = [
+                read_once_func(fp) for fp in filepaths
+            ]
         return read_list
 
     @staticmethod
@@ -904,7 +1028,9 @@ class Files:
         if df.empty:
             logger.warning(f"读取跳过: name={filepath.name}, reason=文件为空")
             return df, "跳过"
-        logger.info(f"读取完成: name={filepath.name}, rows={len(df)}, cols={len(df.columns)}")
+        logger.info(
+            f"读取完成: name={filepath.name}, rows={len(df)}, cols={len(df.columns)}"
+        )
         return df, "完成"
 
     @staticmethod
@@ -921,7 +1047,9 @@ class Files:
         if df.empty:
             logger.warning(f"读取跳过: name={filepath.name}, reason=文件为空")
             return df, "跳过"
-        logger.info(f"读取完成: name={filepath.name}, rows={len(df)}, cols={len(df.columns)}")
+        logger.info(
+            f"读取完成: name={filepath.name}, rows={len(df)}, cols={len(df.columns)}"
+        )
         return df, "完成"
 
     @staticmethod
@@ -938,7 +1066,9 @@ class Files:
         if df.empty:
             logger.warning(f"读取跳过: name={filepath.name}, reason=文件为空")
             return df, "跳过"
-        logger.info(f"读取完成: name={filepath.name}, rows={len(df)}, cols={len(df.columns)}")
+        logger.info(
+            f"读取完成: name={filepath.name}, rows={len(df)}, cols={len(df.columns)}"
+        )
         return df, "完成"
 
     @staticmethod
@@ -967,7 +1097,9 @@ class Files:
             else:
                 skipped.append(k)  # 非一维变量无法作为数据列, 仅记录以便排查
         if not arr:
-            logger.warning(f"读取跳过: name={filepath.name}, reason=未找到一维数组变量, vars={list(user_vars.keys())}")
+            logger.warning(
+                f"读取跳过: name={filepath.name}, reason=未找到一维数组变量, vars={list(user_vars.keys())}"
+            )
             return pd.DataFrame(), "跳过"
         # ------------------------------------------------------------------------#
         # 构建 DataFrame 并记录元数据
@@ -1074,14 +1206,18 @@ class Folder(anytree.Node):
         # 2. 字符串与字符串列表索引
         elif isinstance(item, (str, list)):
             target_names = [item] if isinstance(item, str) else item
-            valid_folders = [child for child in self.children if child.name in target_names]
+            valid_folders = [
+                child for child in self.children if child.name in target_names
+            ]
             if valid_folders:
                 # 字符串索引返回单个节点, 列表索引返回列表
                 return valid_folders[0] if isinstance(item, str) else valid_folders
             else:
                 raise KeyError(f"key={item}: 未找到对应名称的子节点")
         else:
-            raise KeyError(f"key={item}: Folder对象索引仅支持整数、切片、字符串和字符串列表")
+            raise KeyError(
+                f"key={item}: Folder对象索引仅支持整数、切片、字符串和字符串列表"
+            )
 
     # --------------------------------------------------------------------------------#
     # 动态可读属性
@@ -1109,7 +1245,11 @@ class Folder(anytree.Node):
         file_tables = [files._fileTable for files in allfiles]
         file_count = sum(len(table) for table in file_tables)
         size_total = float(sum(table["size[MB]"].sum() for table in file_tables))
-        return {"valid_node_count": valid_node_count, "file_count": file_count, "size_total": size_total}
+        return {
+            "valid_node_count": valid_node_count,
+            "file_count": file_count,
+            "size_total": size_total,
+        }
 
     # --------------------------------------------------------------------------------#
     # Files对象管理与加载
@@ -1126,7 +1266,9 @@ class Folder(anytree.Node):
         if hasattr(self, "_files"):
             return self._files
         else:
-            raise AttributeError(f"Folder={self}: 该文件夹未发现直接包含的数据文件, 故无Files对象可用")
+            raise AttributeError(
+                f"Folder={self}: 该文件夹未发现直接包含的数据文件, 故无Files对象可用"
+            )
 
     @files.setter
     def files(self, value: Files):
@@ -1186,7 +1328,9 @@ class Folder(anytree.Node):
             parts.append(files.load(**kwargs)._rebased(chain))  # 直接穿透传递读取参数
         return LoadData._concat(parts)
 
-    def matchfiles(self, match: str, filter: Optional[str] = None, query: Optional[str] = None) -> List[Files]:
+    def matchfiles(
+        self, match: str, filter: Optional[str] = None, query: Optional[str] = None
+    ) -> List[Files]:
         """
         筛选并返回该Folder挂载的符合匹配条件的Files对象
 
@@ -1253,7 +1397,7 @@ class Folder(anytree.Node):
 
     def loadMatch(
         self,
-        match: str,
+        match: Optional[str] = "",
         filter: Optional[str] = None,
         query: Optional[str] = None,
         **kwargs,
@@ -1265,7 +1409,7 @@ class Folder(anytree.Node):
 
         Parameters
         ----------
-        match : str
+        match : str, default=""
             Folder级筛选参数, 使用文件夹名关键词进行工况筛选, 例如 'testA, case1'
         filter : str, optional
             Files级筛选参数, 使用文件名正则模式进行数据文件筛选, 例如 '.*_test.*'
@@ -1284,12 +1428,18 @@ class Folder(anytree.Node):
             汇总加载结果. 工况链为相对加载节点的路径, 索引表记录全部数据文件与读取状态
         """
         # 搜集
-        logger.info(f"Folder匹配筛选开始: node={self.name}, match={match}, filter={filter}, query={query}")
+        logger.info(
+            f"Folder匹配筛选开始: node={self.name}, match={match}, filter={filter}, query={query}"
+        )
         Listfiles = self.matchfiles(match=match, filter=filter, query=query)
         if Listfiles != []:
-            logger.info(f"Folder匹配筛选完成: total={len(self.allfiles)}, match={len(Listfiles)}")  # noqa: E501
+            logger.info(
+                f"Folder匹配筛选完成: total={len(self.allfiles)}, match={len(Listfiles)}"
+            )  # noqa: E501
         else:
-            logger.warning(f"Folder匹配加载中止: node={self.name}, reason=筛选后无可加载文件")
+            logger.warning(
+                f"Folder匹配加载中止: node={self.name}, reason=筛选后无可加载文件"
+            )
             return LoadData._empty()
         # 加载
         start_time = time()
@@ -1301,7 +1451,9 @@ class Folder(anytree.Node):
                 f"done={len(Loaddata._payload)}, elapsed={consumed_time:.2f}s"
             )
         else:
-            logger.warning(f"Folder匹配加载中止: node={self.name}, reason=未从筛选到的Files中读取到有效数据")
+            logger.warning(
+                f"Folder匹配加载中止: node={self.name}, reason=未从筛选到的Files中读取到有效数据"
+            )
         return Loaddata
 
     def loadAll(self, **kwargs) -> LoadData:
@@ -1328,7 +1480,9 @@ class Folder(anytree.Node):
         start_time = time()
         logger.info(f"Folder加载开始: node={self.name}, count={len(Listfiles)}")
         if not Listfiles:
-            logger.warning(f"Folder加载中止: node={self.name}, reason=未从任何Files中读取到有效数据")
+            logger.warning(
+                f"Folder加载中止: node={self.name}, reason=未从任何Files中读取到有效数据"
+            )
             return LoadData._empty()
         Loaddata = Folder._load_batch(self.rootpath, Listfiles, **kwargs)
         if len(Loaddata._payload) > 0:
@@ -1338,7 +1492,9 @@ class Folder(anytree.Node):
                 f"elapsed={consumed_time:.2f}s"
             )
         else:
-            logger.warning(f"Folder加载中止: node={self.name}, reason=未从任何Files中读取到有效数据")
+            logger.warning(
+                f"Folder加载中止: node={self.name}, reason=未从任何Files中读取到有效数据"
+            )
         return Loaddata
 
 
@@ -1424,9 +1580,7 @@ class Dataset(Folder):
     # --------------------------------------------------------------------------------#
     # Python特性支持
     def __repr__(self) -> str:
-        return (
-            f"Dataset(name={self.setname}, root=[{self._rootpath}], type={self.filetype}, nodes={len(self.allfiles)})"  # noqa: E501
-        )
+        return f"Dataset(name={self.setname}, root=[{self._rootpath}], type={self.filetype}, nodes={len(self.allfiles)})"  # noqa: E501
 
     # --------------------------------------------------------------------------------#
     # 目录扫描与结构构建内部方法
@@ -1446,7 +1600,9 @@ class Dataset(Folder):
                     if entry.name.startswith("."):
                         continue
                     # 处理文件: 收集目标类型文件的元数据
-                    if entry.is_file(follow_symlinks=False) and entry.name.lower().endswith(self.filetype):
+                    if entry.is_file(
+                        follow_symlinks=False
+                    ) and entry.name.lower().endswith(self.filetype):
                         # 获取缓存的 stat 信息
                         stat = entry.stat(follow_symlinks=False)
                         find_records.append(
@@ -1466,10 +1622,14 @@ class Dataset(Folder):
         # 2. 挂载数据文件到传入扫描节点
         if find_records:
             try:
-                node.files = Files(root=str(path), type=self.filetype, records=find_records)
+                node.files = Files(
+                    root=str(path), type=self.filetype, records=find_records
+                )
             except Exception:
                 logger.warning(f"节点挂载失败: path={path}", exc_info=True)
-        logger.info(f"节点扫描完成: path={path}, nodes={len(sub_folders)}, files={len(find_records)}")
+        logger.info(
+            f"节点扫描完成: path={path}, nodes={len(sub_folders)}, files={len(find_records)}"
+        )
         # ------------------------------------------------------------------------#
         # 3. 递归扫描发现的子目录
         for folder in sub_folders:
